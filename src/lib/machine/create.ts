@@ -1,5 +1,6 @@
+import type { Actions, Conditions, Machine, Store, Transitions } from './types';
 import { get, type Writable } from 'svelte/store';
-import type { Actions, Conditions, Machine, Store, UnionToIntersection } from './types';
+import type { SetRequired, UnionToIntersection } from 'type-fest';
 
 export function createMachine<M extends Machine, S extends Store>(options: {
 	actions: Actions,
@@ -9,6 +10,10 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 	store: S
 }) {
 	const { actions, conditions, machine, state, store } = options;
+
+	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
+	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
+	type EventHandlers = HaveEventHandlers['on'];
 
 	return (new Proxy(store, {
 		get(target, prop, receiver) {
@@ -22,25 +27,34 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 
 			return function (...args: any) {
 				const $state = get(state);
-				const listeners = machine.states[$state].on;
-				const transitions = listeners && Object.hasOwn(listeners, prop)
-					? listeners[prop]
-					: machine?.on?.[prop] || [];
+				const listeners = {
+					// check for machine-level listener if machine[state] doesn't exist
+					...machine.on,
+					...machine.states[$state].on,
+				};
+				const handlers = [
+					...(listeners[prop] ?? []),
+					...(machine.states[$state].always || []),
+				];
 
-				for (const { actions: transitionActions, condition, transitionTo } of transitions) {
+
+				for (const { actions: transitionActions, condition, transitionTo } of handlers) {
 					if (condition) {
-						const isSatisfied = conditions[/** @type {keyof conditions} */(condition)]();
-						if (!isSatisfied) break;
+						const isSatisfied = conditions[condition](...args);
+						if (!isSatisfied) continue;
 					}
-					/** @type {string[]} */
-					const actionQueue = [];
+
+					const actionQueue: string[] = [];
 
 					if (transitionTo) {
 						const currentState = get(state);
 						actionQueue.push(...machine.states[currentState].exit?.actions || []);
 						actionQueue.push(...transitionActions || []);
 						actionQueue.push(...machine.states[transitionTo].entry?.actions || []);
-						state.set(/** @type {"deleted" | "editing" | "reading"} */(transitionTo));
+						if (!Object.hasOwn(machine.states, transitionTo)) {
+							throw Error(`Attempted transition to unknown state '${transitionTo}'`);
+						}
+						state.set(transitionTo);
 					} else {
 						actionQueue.push(...transitionActions || []);
 					}
@@ -48,11 +62,13 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 					for (const action of actionQueue) {
 						actions[action](...args);
 					}
-				}
 
+					// Do not execute actions/transitions that follow a successful transition
+					if (transitionTo) break;
+				}
 			}
 		},
 	})) as S & {
-		[key in keyof UnionToIntersection<M['on'] | M['states'][keyof M['states']]['on']>]: (...args: any) => any
+		[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
 	};
 }

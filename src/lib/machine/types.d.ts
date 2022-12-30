@@ -1,3 +1,4 @@
+import type { Exact } from 'type-fest';
 import type { Subscriber } from 'svelte/store'
 
 export interface Actions {
@@ -8,26 +9,29 @@ export interface Conditions {
 	[x: string]: (...args: any) => boolean;
 }
 
+interface LooseHandler {
+	actions?: string[],
+	transitionTo?: string,
+	condition?: string,
+}
+
+export type Handler = {
+	[K in keyof LooseHandler]: K extends keyof LooseHandler ? LooseHandler[K] : never
+}
+
 export interface States {
 	states: {
 		[k: string]: Transitions & {
-			entry?: {
-				actions: string[],
-			},
-			exit?: {
-				actions: string[],
-			}
+			always?: Handler[],
+			entry?: Handler,
+			exit?: Handler,
 		},
 	}
 }
 
 export interface Transitions {
 	on?: {
-		[k: string]: {
-			actions?: string[],
-			transitionTo?: string,
-			condition?: string,
-		}[],
+		[k: string]: Handler[],
 	}
 };
 
