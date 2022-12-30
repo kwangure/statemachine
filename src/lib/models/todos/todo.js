@@ -1,4 +1,4 @@
-import { get, derived, writable } from 'svelte/store';
+import { derived, get } from 'svelte/store';
 import { createMachine } from '$lib/machine/create';
 import { thing } from '$lib/thing/thing';
 
@@ -19,11 +19,11 @@ export function todo(data) {
     const id = thing(data.id);
     const title = thing(data.title, {
         /** @returns {string} */
-        fromPrevTitle: () => get(prevTitle.store),
-        set: (_currentTitle, newTitle) => newTitle,
+        fromPrevTitle() { return this.data.prevTitle },
+        set: (_, newTitle) => newTitle,
     });
     const prevTitle = thing('', {
-        fromTitle: () => get(title.store),
+        fromTitle() { return this.data.title },
     });
     const completed = thing(false, {
         falsify: () => false,
@@ -134,7 +134,9 @@ export function todo(data) {
     };
 
     const conditions = {
-        titleNotEmpty: () => get(title.store).trim().length > 0,
+        titleNotEmpty() {
+            return this.data.title.trim().length > 0;
+        },
     };
 
     const store = {

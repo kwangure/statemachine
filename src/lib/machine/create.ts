@@ -18,6 +18,19 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
 	type EventHandlers = HaveEventHandlers['on'];
 
+	const scope = {
+		data: Object.create(null),
+	};
+	for (const value in data) {
+		if (Object.hasOwn(data, value)) {
+			Object.defineProperty(scope.data, value, {
+				get() {
+					return get(data[value].store);
+				},
+			});
+		}
+	}
+
 	return (new Proxy(store, {
 		get(target, prop, receiver) {
 			if (Object.hasOwn(target, prop)) {
@@ -43,7 +56,7 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 
 				for (const { actions: transitionActions, condition, transitionTo } of handlers) {
 					if (condition) {
-						const isSatisfied = conditions[condition](...args);
+						const isSatisfied = conditions[condition].call(scope, ...args);
 						if (!isSatisfied) continue;
 					}
 
@@ -57,7 +70,7 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 						if (!Object.hasOwn(state.ops, transitionTo)) {
 							throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
 						}
-						state.ops[transitionTo]();
+						state.ops[transitionTo].call(scope);
 					} else {
 						actionQueue.push(...transitionActions || []);
 					}
@@ -72,9 +85,9 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 							if (!Object.hasOwn(data[value].ops, op)) {
 								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
 							}
-							data[value].ops[op](...args);
+							data[value].ops[op].call(scope, ...args);
 						} else if (Object.hasOwn(actions, action)) {
-							actions[action](...args);
+							actions[action].call(scope, ...args);
 						} else {
 							throw Error(`Attempted run to unknown action '${action}'`);
 						}

@@ -1,7 +1,8 @@
 import { writable } from "svelte/store";
 
 interface Ops<T> {
-	[x: string]: (value: T, ...args: any) => T
+	// TODO: generic infer `this` in create
+	[x: string]: (this: any, value: T, ...args: any) => T
 }
 
 export function thing<T, S extends Ops<T>>(value: T, ops?: S) {
@@ -13,8 +14,8 @@ export function thing<T, S extends Ops<T>>(value: T, ops?: S) {
 	} = Object.create(null);
 
 	for (const name in ops) {
-		storeOps[name] = (...args) => {
-			update((value) => ops[name](value, ...args))
+		storeOps[name] = function (...args) {
+			update((value) => ops[name].call(this, value, ...args))
 		};
 	}
 
