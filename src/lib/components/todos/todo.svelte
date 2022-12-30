@@ -30,9 +30,9 @@
 	data-todo-state={$todo.data.completed ? "completed" : "active"}>
     <div class="view">
 		<input id={$todo.data.id} class="toggle" type="checkbox" on:change={todo.TOGGLE_COMPLETE} checked={$todo.data.completed}/>
-        <label for={$todo.data.id} on:dblclick={todo.EDIT}>
+        <div class='label' on:dblclick={todo.EDIT}>
 			{$todo.data.title}
-		</label>
+		</div>
         <button class="destroy" on:click={todo.DELETE} />
     </div>
     <input class="edit" value={$todo.data.title} use:focus={$todo.state}
