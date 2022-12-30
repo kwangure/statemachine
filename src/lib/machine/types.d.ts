@@ -1,5 +1,5 @@
 import type { Exact } from 'type-fest';
-import type { Subscriber } from 'svelte/store'
+import type { Readable, Subscriber } from 'svelte/store'
 
 export interface Actions {
 	[x: string]: (...args: any) => any;
@@ -7,6 +7,17 @@ export interface Actions {
 
 export interface Conditions {
 	[x: string]: (...args: any) => boolean;
+}
+
+export interface Data<T = any> {
+	[x: string] : Thing<T>
+}
+
+export interface Thing<T> {
+	ops: {
+		[x: string]: (...args: any) => void;
+	},
+	store: Readable<T>;
 }
 
 interface LooseHandler {

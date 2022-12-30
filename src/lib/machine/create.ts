@@ -1,15 +1,18 @@
-import type { Actions, Conditions, Machine, Store, Transitions } from './types';
-import { get, type Writable } from 'svelte/store';
+import type { Actions, Conditions, Data, Machine, Store, Thing, Transitions } from './types';
+import { get } from 'svelte/store';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 
-export function createMachine<M extends Machine, S extends Store>(options: {
+const dataOpRE = /^\$(\w+)\.(\w+)$/;
+
+export function createMachine<M extends Machine, S extends Store, D extends Data>(options: {
 	actions: Actions,
+	data: D,
 	conditions: Conditions,
 	machine: M,
-	state: Writable<string>,
+	state: Thing<string>,
 	store: S
 }) {
-	const { actions, conditions, machine, state, store } = options;
+	const { actions, conditions, data, machine, state, store } = options;
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
@@ -26,7 +29,7 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 			if (!isEventListener) return;
 
 			return function (...args: any) {
-				const $state = get(state);
+				const $state = get(state.store);
 				const listeners = {
 					// check for machine-level listener if machine[state] doesn't exist
 					...machine.on,
@@ -47,20 +50,34 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 					const actionQueue: string[] = [];
 
 					if (transitionTo) {
-						const currentState = get(state);
+						const currentState = get(state.store);
 						actionQueue.push(...machine.states[currentState].exit?.actions || []);
 						actionQueue.push(...transitionActions || []);
 						actionQueue.push(...machine.states[transitionTo].entry?.actions || []);
-						if (!Object.hasOwn(machine.states, transitionTo)) {
-							throw Error(`Attempted transition to unknown state '${transitionTo}'`);
+						if (!Object.hasOwn(state.ops, transitionTo)) {
+							throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
 						}
-						state.set(transitionTo);
+						state.ops[transitionTo]();
 					} else {
 						actionQueue.push(...transitionActions || []);
 					}
 
 					for (const action of actionQueue) {
-						actions[action](...args);
+						const match = dataOpRE.exec(action);
+						if (match) {
+							const [_, value, op] =  match;
+							if (!Object.hasOwn(data, value)) {
+								throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
+							}
+							if (!Object.hasOwn(data[value].ops, op)) {
+								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
+							}
+							data[value].ops[op](...args);
+						} else if (Object.hasOwn(actions, action)) {
+							actions[action](...args);
+						} else {
+							throw Error(`Attempted run to unknown action '${action}'`);
+						}
 					}
 
 					// Do not execute actions/transitions that follow a successful transition

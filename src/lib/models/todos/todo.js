@@ -1,5 +1,6 @@
 import { get, derived, writable } from 'svelte/store';
 import { createMachine } from '$lib/machine/create';
+import { thing } from '$lib/thing/thing';
 
 /**
     @param {{
@@ -10,13 +11,28 @@ import { createMachine } from '$lib/machine/create';
     }} data
  */
 export function todo(data) {
-    const state = writable(data.initial || "reading");
-    const id = writable(data.id);
-    const title = writable(data.title);
-    const prevTitle = writable('');
-    const completed = writable(false);
+    const state = thing(data.initial || "reading", {
+        deleted: () => 'deleted',
+        editing: () => 'editing',
+        reading: () => 'reading',
+    });
+    const id = thing(data.id);
+    const title = thing(data.title, {
+        /** @returns {string} */
+        fromPrevTitle: () => get(prevTitle.store),
+        set: (_currentTitle, newTitle) => newTitle,
+    });
+    const prevTitle = thing('', {
+        fromTitle: () => get(title.store),
+    });
+    const completed = thing(false, {
+        falsify: () => false,
+        toggle: (value) => !value,
+        truthify: () => true,
+    });
+
     const merged = derived(
-        [completed, id, prevTitle, title, state],
+        [completed.store, id.store, prevTitle.store, title.store, state.store],
         ([$completed, $id, $prevTitle, $title, $state]) => {
             return {
                 state: $state,
@@ -47,19 +63,19 @@ export function todo(data) {
                     }],
                     SET_ACTIVE: [{
                         actions: [
-                            "completedFalse",
+                            "$completed.falsify",
                             "commit",
                         ],
                     }],
                     SET_COMPLETED: [{
                         actions: [
-                            "completedTrue",
+                            "$completed.truthify",
                             "commit",
                         ],
                     }],
                     TOGGLE_COMPLETE: [{
                         actions: [
-                            "completedToggle",
+                            "$completed.toggle",
                             "commit",
                         ],
                     }],
@@ -74,7 +90,7 @@ export function todo(data) {
             editing: {
                 entry: {
                     actions: [
-                        "prevTitleFromTitle",
+                        "$prevTitle.fromTitle",
                     ],
                 },
                 on: {
@@ -88,13 +104,13 @@ export function todo(data) {
                         {
                             transitionTo: "reading",
                             actions: [
-                                "titleFromPrevTitle",
+                                "$title.fromPrevTitle",
                             ],
                         },
                     ],
                     CHANGE: [{
                         actions: [
-                            "setTitle",
+                            "$title.set",
                         ],
                     }],
                     COMMIT: [
@@ -114,20 +130,12 @@ export function todo(data) {
 
     const actions = {
         commit: () => sendParent('TODO.COMMIT'),
-        completedFalse: () => completed.set(false),
-        completedTrue: () => completed.set(true),
-        completedToggle: () => completed.update((value) => !value),
-        delete: () => sendParent('TODO.DELETE', get(id)),
-        prevTitleFromTitle: () => prevTitle.set(get(title)),
-        /** @param {string} value */
-        setTitle: (value) => title.set(value),
-        titleFromPrevTitle: () => title.set(get(prevTitle)),
+        delete: () => sendParent('TODO.DELETE', get(id.store)),
     };
 
     const conditions = {
-        titleNotEmpty: () => get(title).trim().length > 0,
+        titleNotEmpty: () => get(title.store).trim().length > 0,
     };
-
 
     const store = {
         /**
@@ -140,5 +148,11 @@ export function todo(data) {
         destroy() { },
     };
 
-    return createMachine({ actions, conditions, machine, state, store });
+    const data2 = {
+        completed,
+        prevTitle,
+        title,
+    }
+
+    return createMachine({ actions, conditions, data: data2, machine, state, store });
 }
