@@ -22,9 +22,10 @@ export function createMachine<M extends Machine, S extends Store>(options: {
 
 			return function (...args: any) {
 				const $state = get(state);
-				const transitions = Object.hasOwn(machine.states[$state].on, prop)
-					? machine.states[$state].on[prop]
-					: machine.on[prop] || [];
+				const listeners = machine.states[$state].on;
+				const transitions = listeners && Object.hasOwn(listeners, prop)
+					? listeners[prop]
+					: machine?.on?.[prop] || [];
 
 				for (const { actions: transitionActions, condition, transitionTo } of transitions) {
 					if (condition) {

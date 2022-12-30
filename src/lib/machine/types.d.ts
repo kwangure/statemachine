@@ -22,7 +22,7 @@ export interface States {
 }
 
 export interface Transitions {
-	on: {
+	on?: {
 		[k: string]: {
 			actions?: string[],
 			transitionTo?: string,
@@ -34,7 +34,7 @@ export interface Transitions {
 export type Machine = States & Transitions;
 
 export interface Store {
-	createParentSender: (fn : (event: string, value?: any) => void) => void;
+	createParentSender?: (fn : (event: string, value?: any) => void) => void;
 	subscribe: Subscriber,
 	destroy: (...args: any) => any;
 }
