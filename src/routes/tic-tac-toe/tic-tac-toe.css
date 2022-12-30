@@ -1,0 +1,22 @@
+html,
+body {
+	height: 100%;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background: rgb(3, 12, 63);
+	color: white;
+}
+
+*,
+*:before,
+*:after {
+	position: relative;
+	box-sizing: border-box;
+}

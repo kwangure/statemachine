@@ -14,6 +14,7 @@
 		"@sveltejs/kit": "next",
 		"svelte": "^3.44.0",
 		"svelte-check": "^2.7.1",
+		"type-fest": "^3.5.0",
 		"typescript": "^4.7.4",
 		"vite": "^4.0.3"
 	},
