@@ -1,4 +1,5 @@
 import { get, derived, writable } from 'svelte/store';
+import { createMachine } from '$lib/machine/create';
 
 /**
     @param {{
@@ -32,29 +33,6 @@ export function todo(data) {
     /** @type {(event: string, value?: any) => void} */
     let sendParent = () => {};
 
-    /**
-        @typedef {{
-            on: {
-                [k: string]: {
-                    actions?: string[],
-                    transitionTo?: string,
-                    condition?: string,
-                }[],
-            }
-        }} Transitions
-        @type {Transitions & {
-            states: {
-                [k: string]: Transitions & {
-                    entry?: {
-                        actions: string[],
-                    },
-                    exit?: {
-                        actions: string[],
-                    }
-                },
-            }
-        }}
-     */
     const machine = {
         on: {
             DELETE: [{
@@ -134,7 +112,6 @@ export function todo(data) {
         },
     };
 
-    /** @type {Record<string, (...args: any) => any>} */
     const actions = {
         commit: () => sendParent('TODO.COMMIT'),
         completedFalse: () => completed.set(false),
@@ -163,55 +140,5 @@ export function todo(data) {
         destroy() { },
     };
 
-    /**
-        @typedef {keyof import('./types').UnionToIntersection<
-            (typeof machine)['on'] |
-            (typeof machine.states)[keyof typeof machine.states]['on']
-        >} EventType
-        @typedef {{ [key in EventType] : (...args: any) => any}} Action
-    */
-    return /** @type {typeof store & Action} */(new Proxy(store, {
-        get(target, prop, receiver) {
-            if (Object.hasOwn(target, prop)) {
-                return Reflect.get(target, prop, receiver);
-            }
-            const isEventListener = typeof prop === 'string'
-                && prop.toUpperCase() === prop;
-
-            if (!isEventListener) return;
-
-            return function (/** @type {any} */ ...args) {
-                const $state = get(state);
-                const transitions = Object.hasOwn(machine.states[$state].on, prop)
-                    ? machine.states[$state].on[prop]
-                    : machine.on[prop] || [];
-
-                for (const { actions: transitionActions, condition, transitionTo } of transitions) {
-                    if (condition) {
-                        const isSatisfied = conditions[/** @type {keyof conditions} */(condition)]();
-                        if (!isSatisfied) break;
-                    }
-                    /** @type {string[]} */
-                    const actionQueue = [];
-
-                    if (transitionTo) {
-                        const currentState = get(state);
-                        actionQueue.push(...machine.states[currentState].exit?.actions || []);
-                        actionQueue.push(...transitionActions || []);
-                        actionQueue.push(...machine.states[transitionTo].entry?.actions || []);
-                        state.set(/** @type {"deleted" | "editing" | "reading"} */(transitionTo));
-                    } else {
-                        actionQueue.push(...transitionActions || []);
-                    }
-
-                    console.log({ actionQueue });
-
-                    for (const action of actionQueue) {
-                        actions[action](...args);
-                    }
-                }
-
-            }
-        },
-    }));
+    return createMachine({ actions, conditions, machine, state, store });
 }
