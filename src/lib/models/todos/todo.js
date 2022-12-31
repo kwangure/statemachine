@@ -46,9 +46,6 @@ export function todo(data) {
         });
     const { subscribe } = merged;
 
-    /** @type {(event: string, value?: any) => void} */
-    let sendParent = () => {};
-
     const machine = {
         on: {
             DELETE: [{
@@ -129,8 +126,12 @@ export function todo(data) {
     };
 
     const actions = {
-        commit: () => sendParent('TODO.COMMIT'),
-        delete: () => sendParent('TODO.DELETE', get(id.store)),
+        commit() {
+            this.sendParent('TODO.COMMIT')
+        },
+        delete() {
+            this.sendParent('TODO.DELETE', get(id.store))
+        },
     };
 
     const conditions = {
@@ -140,12 +141,6 @@ export function todo(data) {
     };
 
     const store = {
-        /**
-         * @param {(event: string, value?: any) => void} fn
-         */
-        createParentSender(fn) {
-            if (typeof fn === 'function') sendParent = fn;
-        },
         subscribe,
         destroy() { },
     };

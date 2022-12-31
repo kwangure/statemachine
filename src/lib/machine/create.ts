@@ -18,9 +18,23 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
 	type EventHandlers = HaveEventHandlers['on'];
 
+	let sendParent: (event: string, value?: any) => void;
 	const scope = {
 		data: Object.create(null),
+		sendParent(event: string, value: any) {
+			if (!sendParent) {
+				throw Error([
+					'Attempted to call \'sendParent\' before assigning a parent sender.',
+					'Usage:',
+					'    store.createParentSender((event, value) => {',
+					'        dispatch(event, value);',
+					'    });',
+				].join('\n'));
+			}
+			sendParent(event, value);
+		},
 	};
+
 	for (const value in data) {
 		if (Object.hasOwn(data, value)) {
 			Object.defineProperty(scope.data, value, {
@@ -30,6 +44,10 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 			});
 		}
 	}
+
+	store.createParentSender = (fn: (event: string, value?: any) => void) => {
+		if (typeof fn === 'function') sendParent = fn;
+	};
 
 	return (new Proxy(store, {
 		get(target, prop, receiver) {
@@ -99,6 +117,8 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 			}
 		},
 	})) as S & {
+		createParentSender: (fn: (event: string, value?: any) => void) => void
+	} & {
 		[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
 	};
 }
