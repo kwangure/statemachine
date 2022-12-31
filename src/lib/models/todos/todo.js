@@ -11,11 +11,6 @@ import { thing } from '$lib/thing/thing';
     }} data
  */
 export function todo(data) {
-    const state = thing(data.initial || "reading", {
-        deleted: () => 'deleted',
-        editing: () => 'editing',
-        reading: () => 'reading',
-    });
     const id = thing(data.id);
     const title = thing(data.title, {
         /** @returns {string} */
@@ -131,5 +126,6 @@ export function todo(data) {
         title,
     }
 
-    return createMachine({ actions, conditions, data: data2, machine, state });
+    return createMachine({
+        actions, conditions, data: data2, machine, initial: data.initial });
 }

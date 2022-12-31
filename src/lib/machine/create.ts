@@ -1,6 +1,7 @@
-import type { Actions, Conditions, Data, Machine, Thing, Transitions } from './types';
+import type { Actions, Conditions, Data, Machine, Transitions } from './types';
 import { derived, get } from 'svelte/store';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
+import { thing } from '$lib/thing/thing';
 
 const dataOpRE = /^\$(\w+)\.(\w+)$/;
 
@@ -9,9 +10,14 @@ export function createMachine<M extends Machine, D extends Data>(options: {
 	data: D,
 	conditions: Conditions,
 	machine: M,
-	state: Thing<string>,
+	initial?: string,
 }) {
-	const { actions, conditions, data, machine, state } = options;
+	const { actions, conditions, data, initial, machine } = options;
+
+	const states = Object.keys(machine.states);
+	const setters = Object
+		.fromEntries(states.map((state) => [state, () => state]))
+	const state  = thing(initial || states[0], setters);
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
