@@ -30,11 +30,11 @@ export function createMachine<
 	M extends Machine<M, ActionList, keyof Conditions>,
 	D extends { [key: string]: any },
 	ActionScope extends {
-		data: { [key in keyof D]: D[key]};
+		data: { [key in keyof D]: D[key] };
 		sendParent: (event: string, value?: any) => void;
 	},
 	ComputedScope extends {
-		data: { [key in keyof D]: D[key]};
+		data: { [key in keyof D]: D[key] };
 	},
 	A extends {
 		[x: string]: (this: ActionScope, ...args: any) => any;
@@ -50,21 +50,21 @@ export function createMachine<
 			[x: string]: (this: ActionScope, value: D[k], ...args: any) => D[k]
 		}
 	}>(options: {
-	actions?: A,
-	data?: D,
-	conditions?: Conditions,
-	computed?: Computed,
-	machine: M,
-	initial?: keyof M['states'],
-	ops?: O,
-}) {
+		actions?: A,
+		data?: D,
+		conditions?: Conditions,
+		computed?: Computed,
+		machine: M,
+		initial?: keyof M['states'],
+		ops?: O,
+	}) {
 	const nullo = () => Object.create(null);
-	const { actions, computed, conditions, data = nullo(), initial, machine, ops = nullo()  } = options;
+	const { actions, computed, conditions, data = nullo(), initial, machine, ops = nullo() } = options;
 
 	const states = Object.keys(machine.states);
 	const setters = Object
 		.fromEntries(states.map((state) => [state, () => state]))
-	const state  = thing(initial as string || states[0], setters);
+	const state = thing(initial as string || states[0], setters);
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
@@ -87,9 +87,11 @@ export function createMachine<
 		},
 	} as ActionScope;
 
-	const thingOps: { [x: string]: {
-        [x: string]: (...args: any) => void;
-    }} = Object.create(null);
+	const thingOps: {
+		[x: string]: {
+			[x: string]: (...args: any) => void;
+		}
+	} = Object.create(null);
 	const thingNames: string[] = [];
 	const thingStores: Readable<any>[] = [];
 	for (const [key, value] of Object.entries(data)) {
@@ -105,7 +107,7 @@ export function createMachine<
 	}
 
 	const merged = derived([state.store, ...thingStores],
-        ([$state, ...$things]) => {
+		([$state, ...$things]) => {
 			const entries = $things.map(($thing, i) => {
 				return [thingNames[i], $thing];
 			});
@@ -122,14 +124,14 @@ export function createMachine<
 				Object.defineProperties(data, Object.fromEntries(computedEntries));
 			}
 
-            return { data, state: $state };
-        });
+			return { data, state: $state };
+		});
 
 	const store = {
 		createParentSender: (fn: (event: string, value?: any) => void) => {
 			if (typeof fn === 'function') sendParent = fn;
 		},
-		destroy: () => {},
+		destroy: () => { },
 		subscribe: merged.subscribe,
 	}
 
@@ -188,7 +190,7 @@ export function createMachine<
 					for (const action of actionQueue as string[]) {
 						const match = dataOpRE.exec(action);
 						if (match) {
-							const [_, value, op] =  match;
+							const [_, value, op] = match;
 							if (!Object.hasOwn(thingOps, value)) {
 								throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
 							}
