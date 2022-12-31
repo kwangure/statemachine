@@ -122,5 +122,5 @@ export function ticTacToe() {
 		setWinner: () => winner.update(() => get(player) === 'X' ? 'O' : 'X')
 	}
 
-	return createMachine({ actions, conditions, machine, state, store })
+	return createMachine({ actions, conditions, config: machine, state, store })
 }

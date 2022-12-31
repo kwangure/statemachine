@@ -50,7 +50,7 @@ export function todo(data) {
                 },
             },
         },
-        machine: {
+        config: {
             on: {
                 DELETE: [{
                     transitionTo: "deleted",

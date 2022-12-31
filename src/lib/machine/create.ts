@@ -1,5 +1,5 @@
 import { derived, get, type Readable } from 'svelte/store';
-import type { Handler, Machine, Transitions } from './types';
+import type { Config, Handler, Transitions } from './types';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
 
@@ -27,7 +27,7 @@ type Depth2Path<T, U extends keyof T> = U extends string
 
 export function createMachine<
 	ActionList extends Depth2Path<O, keyof O> | keyof A,
-	M extends Machine<M, ActionList, keyof Conditions>,
+	C extends Config<C, ActionList, keyof Conditions>,
 	D extends { [key: string]: any },
 	ActionScope extends {
 		data: { [key in keyof D]: D[key] };
@@ -54,19 +54,19 @@ export function createMachine<
 		data?: D,
 		conditions?: Conditions,
 		computed?: Computed,
-		machine: M,
-		initial?: keyof M['states'],
+		config: C,
+		initial?: keyof C['states'],
 		ops?: O,
 	}) {
 	const nullo = () => Object.create(null);
-	const { actions, computed, conditions, data = nullo(), initial, machine, ops = nullo() } = options;
+	const { actions, computed, conditions, data = nullo(), initial, config, ops = nullo() } = options;
 
-	const states = Object.keys(machine.states);
+	const states = Object.keys(config.states);
 	const setters = Object
 		.fromEntries(states.map((state) => [state, () => state]))
 	const state = thing(initial as string || states[0], setters);
 
-	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
+	type MightHaveEventHandlers = C | C['states'][keyof C['states']];
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
 	type EventHandlers = HaveEventHandlers['on'];
 
@@ -136,9 +136,9 @@ export function createMachine<
 	}
 
 	const $state = get(state.store);
-	executeHandlers(machine.states[$state].entry || []);
+	executeHandlers(config.states[$state].entry || []);
 
-	function executeHandlers(handlers: Handler<M, ActionList, keyof Conditions>[], ...args: any[]) {
+	function executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
 		for (const { actions: transitionActions = [], condition, transitionTo } of handlers) {
 			if (conditions && condition) {
 				const isSatisfied = conditions[condition].call(actionScope, ...args);
@@ -151,10 +151,10 @@ export function createMachine<
 			}
 			if (transitionTo && typeof transitionTo === 'string') {
 				const currentState = get(state.store);
-				const exitActions = machine.states[currentState].exit
+				const exitActions = config.states[currentState].exit
 					?.map((handlers) => handlers.actions)
 					.filter(isDefined).flat() || [];
-				const entryActions = machine.states[currentState].entry
+				const entryActions = config.states[currentState].entry
 					?.map((handlers) => handlers.actions)
 					.filter(isDefined).flat() || [];
 				actionQueue.push(...exitActions);
@@ -205,12 +205,12 @@ export function createMachine<
 				const $state = get(state.store);
 				const listeners = {
 					// check for machine-level listener if machine.states[$state] doesn't exist
-					...machine.on,
-					...machine.states[$state].on,
+					...config.on,
+					...config.states[$state].on,
 				};
 				const handlers = [
 					...(listeners[prop] ?? []),
-					...(machine.states[$state].always || []),
+					...(config.states[$state].always || []),
 				];
 
 				executeHandlers(handlers, ...args);

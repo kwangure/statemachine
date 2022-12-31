@@ -28,7 +28,7 @@ function getLocalStorageItem(key, defaultValue) {
 export function todos() {
 	return createMachine({
 		initial: 'loading',
-		machine: {
+		config: {
 			states: {
 				loading: {
 					entry: [{
@@ -101,7 +101,7 @@ export function todos() {
 					return [...$todos, newTodo];
 				},
 				delete($todos, deleted) {
-					return $todos.filter((todo) =>{
+					return $todos.filter((todo) => {
 						return todo !== deleted;
 					});;
 				},

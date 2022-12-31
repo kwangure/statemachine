@@ -8,33 +8,33 @@ export interface Thing<T> {
 	store: Readable<T>;
 }
 
-export interface Handler<M extends Machine, A, C> {
+export interface Handler<C extends Config, A, Condition> {
 	actions?: A[],
-	transitionTo?: keyof M['states'],
-	condition?: C,
+	transitionTo?: keyof C['states'],
+	condition?: Condition,
 }
 
-export interface Transitions<M extends Machine = Machine, A extends string = string, C extends string = string> {
+export interface Transitions<C extends Config = Config, A extends string = string, Condition extends string = string> {
 	on?: {
-		[k: string]: Handler<M, A, C>[],
+		[k: string]: Handler<C, A, Condition>[],
 	}
 };
 
-export type Machine<M, A, C> = {
+export type Config<C, A, Condition> = {
 	states: {
 		[k: string]: {
 			on?: {
-				[k: string]: Handler<M, A, C>[],
+				[k: string]: Handler<C, A, Condition>[],
 			}
-			always?: Handler<M, A, C>[],
-			entry?: Handler<M, A, C>[],
-			exit?: Handler<M, A, C>[],
+			always?: Handler<C, A, Condition>[],
+			entry?: Handler<C, A, Condition>[],
+			exit?: Handler<C, A, Condition>[],
 		},
 	},
 	on?: {
-		[k: string]: Handler<M, A, C>[],
+		[k: string]: Handler<C, A, Condition>[],
 	},
 };
 
 export type UnionToIntersection<U> =
-	(U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never
+	(U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never
