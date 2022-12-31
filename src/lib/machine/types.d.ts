@@ -8,41 +8,31 @@ export interface Thing<T> {
 	store: Readable<T>;
 }
 
-export interface Handler<A> {
+export interface Handler<M extends Machine, A, C> {
 	actions?: A[],
-	transitionTo?: string,
-	condition?: string,
+	transitionTo?: keyof M['states'],
+	condition?: C,
 }
 
-export interface States<A extends string = string> {
-	states: {
-		[k: string]: Transitions<A> & {
-			always?: Handler<A>[],
-			entry?: Handler<A>,
-			exit?: Handler<A>,
-		},
-	}
-}
-
-export interface Transitions<A extends string = string> {
+export interface Transitions<M extends Machine = Machine, A extends string = string, C extends string = string> {
 	on?: {
-		[k: string]: Handler<A>[],
+		[k: string]: Handler<M, A, C>[],
 	}
 };
 
-export type Machine<A> = {
+export type Machine<M, A, C> = {
 	states: {
 		[k: string]: {
 			on?: {
-				[k: string]: Handler<A>[],
+				[k: string]: Handler<M, A, C>[],
 			}
-			always?: Handler<A>[],
-			entry?: Handler<A>,
-			exit?: Handler<A>,
+			always?: Handler<M, A, C>[],
+			entry?: Handler<M, A, C>,
+			exit?: Handler<M, A, C>,
 		},
 	},
 	on?: {
-		[k: string]: Handler<A>[],
+		[k: string]: Handler<M, A, C>[],
 	},
 };
 

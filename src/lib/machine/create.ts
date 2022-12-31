@@ -27,7 +27,7 @@ type Depth2Path<T, U extends keyof T> = U extends string
 
 export function createMachine<
 	ActionList extends Depth2Path<O, keyof O> | keyof A,
-	M extends Machine<ActionList>,
+	M extends Machine<M, ActionList, keyof Conditions>,
 	D extends { [key: string]: any },
 	ActionScope extends {
 		data: { [key in keyof D]: D[key]};
@@ -39,8 +39,11 @@ export function createMachine<
 	A extends {
 		[x: string]: (this: ActionScope, ...args: any) => any;
 	},
-	C extends {
+	Computed extends {
 		[x: string]: (this: ComputedScope, ...args: any) => any;
+	},
+	Conditions extends {
+		[x: string]: (this: ActionScope, ...args: any) => boolean;
 	},
 	O extends {
 		[k in keyof D]: {
@@ -49,10 +52,8 @@ export function createMachine<
 	}>(options: {
 	actions?: A,
 	data?: D,
-	conditions?: {
-		[x: string]: (this: ActionScope, ...args: any) => boolean;
-	},
-	computed?: C,
+	conditions?: Conditions,
+	computed?: Computed,
 	machine: M,
 	initial?: keyof M['states'],
 	ops?: O,
@@ -66,7 +67,7 @@ export function createMachine<
 	const state  = thing(initial as string || states[0], setters);
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
-	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions<string>, 'on'>>;
+	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
 	type EventHandlers = HaveEventHandlers['on'];
 
 	let sendParent: (event: string, value?: any) => void;
@@ -109,7 +110,7 @@ export function createMachine<
 				return [thingNames[i], $thing];
 			});
 			const data: D & {
-				[key in keyof C]: ReturnType<C[key]>;
+				[key in keyof Computed]: ReturnType<Computed[key]>;
 			} = Object.fromEntries(entries);
 
 			if (computed) {
@@ -163,7 +164,7 @@ export function createMachine<
 
 					const actionQueue: ActionList[] = [];
 
-					if (transitionTo) {
+					if (transitionTo && typeof transitionTo === 'string') {
 						const currentState = get(state.store);
 						actionQueue.push(...machine.states[currentState].exit?.actions || []);
 						actionQueue.push(...transitionActions || []);

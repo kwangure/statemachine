@@ -26,7 +26,6 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 export function todos() {
-	// TODO: type `conditions` & `transitionTo`
 	// TODO: Add loading state to parse JSON
 	const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
 		JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
