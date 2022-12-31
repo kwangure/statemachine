@@ -183,9 +183,8 @@ export function createMachine<
 		}
 	}
 
-	const handlerMap2: {
-		[x: string]:((...args: any) => void)[]
-	} = {}
+	const handlerStateProps = nullo();
+	const handlerMap = nullo();
 	for (let i = 0; i < states.length; i++) {
 		const listeners = {
 			// check for machine-level listener if config.states[state] doesn't exist
@@ -193,23 +192,23 @@ export function createMachine<
 			...config.states[states[i]].on,
 		};
 
+		const listenerMap = nullo();
 		for (const prop in listeners) {
-			if (!handlerMap2[prop]) handlerMap2[prop] = [];
-			handlerMap2[prop].push((...args) => {
-				if (get(state.store) !== states[i]) return;
+			listenerMap[prop] = (...args: any) => {
 				executeHandlers([
 					...(listeners[prop] ?? []),
 					...(config.states[states[i]].always || []),
 				], ...args);
-			});
+			}
+			if (!Object.hasOwn(handlerMap, prop)) {
+				handlerMap[prop] = function (...args: any) {
+					const $state = get(state.store);
+					handlerStateProps[$state][prop]?.(...args);
+				}
+			}
 		}
+		handlerStateProps[states[i]] = listenerMap;
 	};
-	const handlerMap = Object.fromEntries(
-		Object.entries(handlerMap2)
-			.map(([key, funcs]) => {
-				return [key, (...args: any) => funcs.forEach((fn) => fn(...args))];
-			}),
-	);
 
 	return {
 		...handlerMap,
