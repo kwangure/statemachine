@@ -27,8 +27,8 @@ export type Machine<M, A, C> = {
 				[k: string]: Handler<M, A, C>[],
 			}
 			always?: Handler<M, A, C>[],
-			entry?: Handler<M, A, C>,
-			exit?: Handler<M, A, C>,
+			entry?: Handler<M, A, C>[],
+			exit?: Handler<M, A, C>[],
 		},
 	},
 	on?: {

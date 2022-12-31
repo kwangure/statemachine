@@ -84,17 +84,17 @@ export function todo(data) {
                     }
                 },
                 deleted: {
-                    entry: {
+                    entry: [{
                         actions: ["delete"]
-                    },
+                    }],
                     on: {},
                 },
                 editing: {
-                    entry: {
+                    entry: [{
                         actions: [
                             "$prevTitle.fromTitle",
                         ],
-                    },
+                    }],
                     on: {
                         BLUR: [
                             {

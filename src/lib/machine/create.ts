@@ -163,12 +163,20 @@ export function createMachine<
 					}
 
 					const actionQueue: ActionList[] = [];
-
+					function isDefined<T>(argument: T | undefined): argument is T {
+						return argument !== undefined
+					}
 					if (transitionTo && typeof transitionTo === 'string') {
 						const currentState = get(state.store);
-						actionQueue.push(...machine.states[currentState].exit?.actions || []);
+						const exitActions = machine.states[currentState].exit
+							?.map((handlers) => handlers.actions)
+							.filter(isDefined).flat() || [];
+						const entryActions = machine.states[currentState].entry
+							?.map((handlers) => handlers.actions)
+							.filter(isDefined).flat() || [];
+						actionQueue.push(...exitActions);
 						actionQueue.push(...transitionActions || []);
-						actionQueue.push(...machine.states[transitionTo].entry?.actions || []);
+						actionQueue.push(...entryActions);
 						if (!Object.hasOwn(state.ops, transitionTo)) {
 							throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
 						}
