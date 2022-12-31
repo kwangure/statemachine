@@ -5,37 +5,61 @@ import { thing } from '$lib/thing/thing';
 
 const dataOpRE = /^\$(\w+)\.(\w+)$/;
 
+/**
+ *
+ * ```javascript
+ * type Ops = {
+ * 		completed: {
+ * 			toggle: (value: boolean) => boolean;
+ * 		};
+ * 		count: {
+ * 			increment: (value: number) => number;
+ * 		};
+ * 	}
+ *  Depth2Path<Ops, keyof Ops> === "$completed.toggle" | "$count.increment"`
+ * ```
+ */
+type Depth2Path<T, U extends keyof T> = U extends string
+	? keyof T[U] extends string
+		? `$${U}.${keyof T[U]}`
+		: never
+	: never;
+
 export function createMachine<
-	M extends Machine,
+	ActionList extends Depth2Path<O, keyof O> | keyof A,
+	M extends Machine<ActionList>,
 	D extends { [key: string]: any },
 	This extends {
 		data: { [key in keyof D]: D[key]}
 		sendParent: (event: string, value?: any) => void;
-	}>(options: {
-	actions: {
+	},
+	A extends {
 		[x: string]: (this: This, ...args: any) => any;
 	},
-	data: D,
-	conditions: {
-		[x: string]: (this: This, ...args: any) => boolean;
-	},
-	machine: M,
-	initial?: string,
-	ops: {
+	O extends {
 		[k in keyof D]: {
 			[x: string]: (this: This, value: D[k], ...args: any) => D[k]
 		}
+	}>(options: {
+	actions?: A,
+	data?: D,
+	conditions?: {
+		[x: string]: (this: This, ...args: any) => boolean;
 	},
+	machine: M,
+	initial?: keyof M['states'],
+	ops?: O,
 }) {
-	const { actions, conditions, data, initial, machine, ops } = options;
+	const nullo = () => Object.create(null);
+	const { actions, conditions, data = nullo(), initial, machine, ops = nullo()  } = options;
 
 	const states = Object.keys(machine.states);
 	const setters = Object
 		.fromEntries(states.map((state) => [state, () => state]))
-	const state  = thing(initial || states[0], setters);
+	const state  = thing(initial as string || states[0], setters);
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
-	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
+	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions<string>, 'on'>>;
 	type EventHandlers = HaveEventHandlers['on'];
 
 	let sendParent: (event: string, value?: any) => void;
@@ -100,6 +124,7 @@ export function createMachine<
 
 			if (!isEventListener) return;
 
+			let test = machine.states
 			return function (...args: any) {
 				const $state = get(state.store);
 				const listeners = {
@@ -114,12 +139,12 @@ export function createMachine<
 
 
 				for (const { actions: transitionActions, condition, transitionTo } of handlers) {
-					if (condition) {
+					if (conditions && condition) {
 						const isSatisfied = conditions[condition].call(scope, ...args);
 						if (!isSatisfied) continue;
 					}
 
-					const actionQueue: string[] = [];
+					const actionQueue: ActionList[] = [];
 
 					if (transitionTo) {
 						const currentState = get(state.store);
@@ -134,7 +159,7 @@ export function createMachine<
 						actionQueue.push(...transitionActions || []);
 					}
 
-					for (const action of actionQueue) {
+					for (const action of actionQueue as string[]) {
 						const match = dataOpRE.exec(action);
 						if (match) {
 							const [_, value, op] =  match;
@@ -146,7 +171,7 @@ export function createMachine<
 								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
 							}
 							thingOps[value][op].call(scope, ...args);
-						} else if (Object.hasOwn(actions, action)) {
+						} else if (actions && Object.hasOwn(actions, action)) {
 							actions[action].call(scope, ...args);
 						} else {
 							throw Error(`Attempted run to unknown action '${action}'`);

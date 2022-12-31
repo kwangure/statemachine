@@ -8,33 +8,43 @@ export interface Thing<T> {
 	store: Readable<T>;
 }
 
-interface LooseHandler {
-	actions?: string[],
+export interface Handler<A> {
+	actions?: A[],
 	transitionTo?: string,
 	condition?: string,
 }
 
-export type Handler = {
-	[K in keyof LooseHandler]: K extends keyof LooseHandler ? LooseHandler[K] : never
-}
-
-export interface States {
+export interface States<A extends string = string> {
 	states: {
-		[k: string]: Transitions & {
-			always?: Handler[],
-			entry?: Handler,
-			exit?: Handler,
+		[k: string]: Transitions<A> & {
+			always?: Handler<A>[],
+			entry?: Handler<A>,
+			exit?: Handler<A>,
 		},
 	}
 }
 
-export interface Transitions {
+export interface Transitions<A extends string = string> {
 	on?: {
-		[k: string]: Handler[],
+		[k: string]: Handler<A>[],
 	}
 };
 
-export type Machine = States & Transitions;
+export type Machine<A> = {
+	states: {
+		[k: string]: {
+			on?: {
+				[k: string]: Handler<A>[],
+			}
+			always?: Handler<A>[],
+			entry?: Handler<A>,
+			exit?: Handler<A>,
+		},
+	},
+	on?: {
+		[k: string]: Handler<A>[],
+	},
+};
 
 export type UnionToIntersection<U> =
 	(U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never

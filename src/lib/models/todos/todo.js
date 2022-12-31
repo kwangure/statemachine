@@ -9,85 +9,6 @@ import { createMachine } from '$lib/machine/create';
     }} data
  */
 export function todo(data) {
-    const machine = {
-        on: {
-            DELETE: [{
-                transitionTo: "deleted",
-            }],
-        },
-        states: {
-            reading: {
-                on: {
-                    EDIT: [{
-                        transitionTo: "editing",
-                    }],
-                    SET_ACTIVE: [{
-                        actions: [
-                            "$completed.falsify",
-                            "commit",
-                        ],
-                    }],
-                    SET_COMPLETED: [{
-                        actions: [
-                            "$completed.truthify",
-                            "commit",
-                        ],
-                    }],
-                    TOGGLE_COMPLETE: [{
-                        actions: [
-                            "$completed.toggle",
-                            "commit",
-                        ],
-                    }],
-                }
-            },
-            deleted: {
-                entry: {
-                    actions: ["delete"]
-                },
-                on: {},
-            },
-            editing: {
-                entry: {
-                    actions: [
-                        "$prevTitle.fromTitle",
-                    ],
-                },
-                on: {
-                    BLUR: [
-                        {
-                            transitionTo: "reading",
-                            actions: ["commit"],
-                        },
-                    ],
-                    CANCEL: [
-                        {
-                            transitionTo: "reading",
-                            actions: [
-                                "$title.fromPrevTitle",
-                            ],
-                        },
-                    ],
-                    CHANGE: [{
-                        actions: [
-                            "$title.set",
-                        ],
-                    }],
-                    COMMIT: [
-                        {
-                            transitionTo: "reading",
-                            actions: ["commit"],
-                            condition: "titleNotEmpty",
-                        },
-                        {
-                            transitionTo: "deleted",
-                        },
-                    ],
-                }
-            },
-        },
-    };
-
     return createMachine({
         actions: {
             commit() {
@@ -129,7 +50,85 @@ export function todo(data) {
                 },
             },
         },
-        machine,
+        machine: {
+            on: {
+                DELETE: [{
+                    transitionTo: "deleted",
+                    actions: ['commit'],
+                }],
+            },
+            states: {
+                reading: {
+                    on: {
+                        EDIT: [{
+                            transitionTo: "editing",
+                        }],
+                        SET_ACTIVE: [{
+                            actions: [
+                                "$completed.falsify",
+                                "commit",
+                            ],
+                        }],
+                        SET_COMPLETED: [{
+                            actions: [
+                                "$completed.truthify",
+                                "commit",
+                            ],
+                        }],
+                        TOGGLE_COMPLETE: [{
+                            actions: [
+                                "$completed.toggle",
+                                "commit",
+                            ],
+                        }],
+                    }
+                },
+                deleted: {
+                    entry: {
+                        actions: ["delete"]
+                    },
+                    on: {},
+                },
+                editing: {
+                    entry: {
+                        actions: [
+                            "$prevTitle.fromTitle",
+                        ],
+                    },
+                    on: {
+                        BLUR: [
+                            {
+                                transitionTo: "reading",
+                                actions: ["commit"],
+                            },
+                        ],
+                        CANCEL: [
+                            {
+                                transitionTo: "reading",
+                                actions: [
+                                    "$title.fromPrevTitle",
+                                ],
+                            },
+                        ],
+                        CHANGE: [{
+                            actions: [
+                                "$title.set",
+                            ],
+                        }],
+                        COMMIT: [
+                            {
+                                transitionTo: "reading",
+                                actions: ["commit"],
+                                condition: "titleNotEmpty",
+                            },
+                            {
+                                transitionTo: "deleted",
+                            },
+                        ],
+                    }
+                },
+            },
+        },
         initial: data.initial
     });
 }
