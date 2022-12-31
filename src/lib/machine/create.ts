@@ -29,29 +29,36 @@ export function createMachine<
 	ActionList extends Depth2Path<O, keyof O> | keyof A,
 	M extends Machine<ActionList>,
 	D extends { [key: string]: any },
-	This extends {
-		data: { [key in keyof D]: D[key]}
+	ActionScope extends {
+		data: { [key in keyof D]: D[key]};
 		sendParent: (event: string, value?: any) => void;
 	},
+	ComputedScope extends {
+		data: { [key in keyof D]: D[key]};
+	},
 	A extends {
-		[x: string]: (this: This, ...args: any) => any;
+		[x: string]: (this: ActionScope, ...args: any) => any;
+	},
+	C extends {
+		[x: string]: (this: ComputedScope, ...args: any) => any;
 	},
 	O extends {
 		[k in keyof D]: {
-			[x: string]: (this: This, value: D[k], ...args: any) => D[k]
+			[x: string]: (this: ActionScope, value: D[k], ...args: any) => D[k]
 		}
 	}>(options: {
 	actions?: A,
 	data?: D,
 	conditions?: {
-		[x: string]: (this: This, ...args: any) => boolean;
+		[x: string]: (this: ActionScope, ...args: any) => boolean;
 	},
+	computed?: C,
 	machine: M,
 	initial?: keyof M['states'],
 	ops?: O,
 }) {
 	const nullo = () => Object.create(null);
-	const { actions, conditions, data = nullo(), initial, machine, ops = nullo()  } = options;
+	const { actions, computed, conditions, data = nullo(), initial, machine, ops = nullo()  } = options;
 
 	const states = Object.keys(machine.states);
 	const setters = Object
@@ -63,7 +70,7 @@ export function createMachine<
 	type EventHandlers = HaveEventHandlers['on'];
 
 	let sendParent: (event: string, value?: any) => void;
-	const scope = {
+	const actionScope = {
 		data: Object.create(null),
 		sendParent(event: string, value: any) {
 			if (!sendParent) {
@@ -77,7 +84,7 @@ export function createMachine<
 			}
 			sendParent(event, value);
 		},
-	} as This;
+	} as ActionScope;
 
 	const thingOps: { [x: string]: {
         [x: string]: (...args: any) => void;
@@ -89,7 +96,7 @@ export function createMachine<
 		thingOps[key] = ops2;
 		thingNames.push(key);
 		thingStores.push(store);
-		Object.defineProperty(scope.data, key, {
+		Object.defineProperty(actionScope.data, key, {
 			get() {
 				return get(store);
 			},
@@ -101,7 +108,18 @@ export function createMachine<
 			const entries = $things.map(($thing, i) => {
 				return [thingNames[i], $thing];
 			});
-			const data = Object.fromEntries(entries);
+			const data: D & {
+				[key in keyof C]: ReturnType<C[key]>;
+			} = Object.fromEntries(entries);
+
+			if (computed) {
+				const computedEntries = Object
+					.entries(computed)
+					.map(([funcName, func]) => {
+						return [funcName, { get: () => func.call({ data } as ComputedScope) }]
+					});
+				Object.defineProperties(data, Object.fromEntries(computedEntries));
+			}
 
             return { data, state: $state };
         });
@@ -124,11 +142,10 @@ export function createMachine<
 
 			if (!isEventListener) return;
 
-			let test = machine.states
 			return function (...args: any) {
 				const $state = get(state.store);
 				const listeners = {
-					// check for machine-level listener if machine[state] doesn't exist
+					// check for machine-level listener if machine.states[$state] doesn't exist
 					...machine.on,
 					...machine.states[$state].on,
 				};
@@ -140,7 +157,7 @@ export function createMachine<
 
 				for (const { actions: transitionActions, condition, transitionTo } of handlers) {
 					if (conditions && condition) {
-						const isSatisfied = conditions[condition].call(scope, ...args);
+						const isSatisfied = conditions[condition].call(actionScope, ...args);
 						if (!isSatisfied) continue;
 					}
 
@@ -154,7 +171,7 @@ export function createMachine<
 						if (!Object.hasOwn(state.ops, transitionTo)) {
 							throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
 						}
-						state.ops[transitionTo].call(scope);
+						state.ops[transitionTo].call(actionScope);
 					} else {
 						actionQueue.push(...transitionActions || []);
 					}
@@ -163,16 +180,15 @@ export function createMachine<
 						const match = dataOpRE.exec(action);
 						if (match) {
 							const [_, value, op] =  match;
-							console.log({ value, op, thingOps, thingStores })
 							if (!Object.hasOwn(thingOps, value)) {
 								throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
 							}
 							if (!Object.hasOwn(thingOps[value], op)) {
 								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
 							}
-							thingOps[value][op].call(scope, ...args);
+							thingOps[value][op].call(actionScope, ...args);
 						} else if (actions && Object.hasOwn(actions, action)) {
-							actions[action].call(scope, ...args);
+							actions[action].call(actionScope, ...args);
 						} else {
 							throw Error(`Attempted run to unknown action '${action}'`);
 						}

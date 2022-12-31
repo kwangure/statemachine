@@ -1,4 +1,5 @@
-import { derived, get, writable } from 'svelte/store';
+import { createMachine } from '$lib/machine/create';
+import { get } from 'svelte/store';
 import { todo } from "./todo";
 import { uid } from 'uid';
 
@@ -25,114 +26,141 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 export function todos() {
-    const state = writable("ready");
-    const newTodo = writable("");
+	// TODO: type `conditions` & `transitionTo`
+	// TODO: Add loading state to parse JSON
 	const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
 		JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
 	).map((todoJson) => todo(todoJson));
-    const todos = writable(todosJson);
-    const filter = writable('all');
-
-	function persist() {
-		const $todos = get(todos);
-		try {
-			const todosJson = JSON.stringify($todos.map((todo) => get(todo).data));
-			localStorage.setItem(TODOS_STORE, todosJson);
-		} catch (error) {
-			console.error(error);
-		}
-	}
-
-	const merged = derived(
-        [filter, newTodo, state, todos],
-        ([$filter, $newTodo, $state, $todos]) => {
-			const activeTodos = $todos.filter((todo) => !get(todo).data.completed);
-			const completedTodos = $todos.filter((todo) => get(todo).data.completed);
-			const filteredTodos = ($filter === "active")
-				? activeTodos
-				: ($filter === "completed")
-					? completedTodos
-					: $todos;
-			const activeTodoCount = activeTodos.length;
-			const allCompleted = $todos.length > 0 && activeTodoCount === 0;
-			const markAllAs = allCompleted ? "active" : "completed";
-            return {
-                state: $state,
-                data: {
-					activeTodos,
-					allCompleted,
-					completedTodos,
-					filter: $filter,
-					filteredTodos,
-					markAllAs,
-                    newTodo: $newTodo,
-                    todos: $todos,
-                },
-            };
-        });
-
-    const { subscribe } = merged;
-
-    return {
-        subscribe,
-		/**
-		 * @param {string} value
-		 */
-		["NEWTODO.CHANGE"](value) {
-			newTodo.set(value);
+	return createMachine({
+		initial: 'ready',
+		machine: {
+			states: {
+				loading: {
+					always: [{
+						transitionTo: 'ready',
+					}],
+				},
+				ready: {},
+			},
+			on: {
+				'CLEAR_COMPLETED': [{
+					actions: ['$todos.clearCompleted'],
+				}],
+				'MARK.ACTIVE': [{
+					actions: ['$todos.activateAll'],
+				}],
+				'MARK.COMPLETED': [{
+					actions: ['$todos.completeAll'],
+				}],
+				'NEWTODO.CHANGE': [{
+					actions: ['$newTodo.update']
+				}],
+				'NEWTODO.COMMIT': [{
+					actions: ['$newTodo.empty', '$todos.addNew', 'persist'],
+					condition: 'notEmpty',
+				}],
+				'SHOW': [{
+					actions: ['$filter.update'],
+				}],
+				'TODO.COMMIT': [{
+					actions: ['$todos.forceRerender', 'persist'],
+				}],
+				'TODO.DELETE': [{
+					actions: ['$todos.delete', 'persist'],
+				}],
+			}
 		},
-		/**
-		 * @param {string} value
-		 */
-		["NEWTODO.COMMIT"](value) {
-			if (!value.trim().length) return;
-			newTodo.set("");
-			todos.update(($todos) => {
-				$todos.push(todo(createNewTodo(value.trim())))
-				return $todos;
-			});
-			persist();
+		data: {
+			newTodo: '',
+			todos: todosJson,
+			filter: /** @type {'all' | 'active' | 'completed'} */('all'),
 		},
-		["TODO.COMMIT"]() {
-			// fake update to update subscribers
-			todos.update((todo) => todo);
-			persist();
-		},
-		/**
-		 * @param {ReturnType<import('$lib/models/todos/todo').todo>} deleted
-		 */
-		["TODO.DELETE"](deleted) {
-			todos.update(($todos) => {
-				return $todos.filter((todo) =>{
-					return todo !== deleted;
-				});
-			});
-			persist();
-		},
-		/**
-		 * @param {string} type
-		 */
-		["SHOW"](type) {
-			filter.set(type);
-		},
-		["MARK.ACTIVE"]() {
-			const $todos = get(todos);
-			$todos.forEach((todo) => todo.SET_ACTIVE())
-		},
-		["MARK.COMPLETED"]() {
-			const $todos = get(todos);
-			$todos.forEach((todo) => todo.SET_COMPLETED())
-		},
-		CLEAR_COMPLETED() {
-			todos.update(($todos) => {
-				return $todos
-					.filter((todo) => {
+		ops: {
+			newTodo: {
+				update: (_, newValue) => newValue,
+				empty: () => '',
+			},
+			todos: {
+				activateAll($todos) {
+					return $todos.map((todo) => {
+						todo.SET_ACTIVE();
+						return todo;
+					});
+				},
+				clearCompleted($todos) {
+					return $todos.filter((todo) => {
 						const $todo = get(todo);
 						if ($todo.data.completed) todo.destroy();
 						return !$todo.data.completed;
 					});
-			});
-		}
-    }
+				},
+				completeAll($todos) {
+					return $todos.map((todo) => {
+						todo.SET_COMPLETED();
+						return todo;
+					});
+				},
+				addNew($todos, title) {
+					const newTodo = todo(createNewTodo(title.trim()));
+					return [...$todos, newTodo];
+				},
+				delete($todos, deleted) {
+					return $todos.filter((todo) =>{
+						return todo !== deleted;
+					});;
+				},
+				forceRerender($todos) {
+					return [...$todos];
+				}
+			},
+			filter: {
+				update: (_, newFilter) => newFilter,
+			},
+		},
+		computed: {
+			activeTodos() {
+				return this.data.todos
+					.filter((todo) => !get(todo).data.completed);
+			},
+			allCompleted() {
+				return this.data.todos.length > 0 && this.data.todos
+					.filter((todo) => !get(todo).data.completed).length === 0;
+			},
+			completedTodos() {
+				return this.data.todos
+					.filter((todo) => get(todo).data.completed);
+			},
+			filteredTodos() {
+				switch (this.data.filter) {
+					case 'active':
+						return this.data.todos
+							.filter((todo) => !get(todo).data.completed);
+					case 'completed':
+						return this.data.todos
+							.filter((todo) => get(todo).data.completed);
+					default:
+						return this.data.todos;
+				}
+			},
+			markAllAs() {
+				const allCompleted = this.data.todos.length > 0 && this.data.todos
+					.filter((todo) => !get(todo).data.completed).length === 0;
+				return allCompleted ? "active" : "completed";
+			}
+		},
+		actions: {
+			persist() {
+				try {
+					const todosJson = JSON.stringify(this.data.todos.map((todo) => get(todo).data));
+					localStorage.setItem(TODOS_STORE, todosJson);
+				} catch (error) {
+					console.error(error);
+				}
+			},
+		},
+		conditions: {
+			notEmpty: (value) => Boolean(value.trim().length),
+		},
+	});
 }
 
