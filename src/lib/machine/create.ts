@@ -1,18 +1,33 @@
-import type { Actions, Conditions, Data, Machine, Transitions } from './types';
-import { derived, get } from 'svelte/store';
+import { derived, get, type Readable } from 'svelte/store';
+import type { Machine, Transitions } from './types';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
 
 const dataOpRE = /^\$(\w+)\.(\w+)$/;
 
-export function createMachine<M extends Machine, D extends Data>(options: {
-	actions: Actions,
+export function createMachine<
+	M extends Machine,
+	D extends { [key: string]: any },
+	This extends {
+		data: { [key in keyof D]: D[key]}
+		sendParent: (event: string, value?: any) => void;
+	}>(options: {
+	actions: {
+		[x: string]: (this: This, ...args: any) => any;
+	},
 	data: D,
-	conditions: Conditions,
+	conditions: {
+		[x: string]: (this: This, ...args: any) => boolean;
+	},
 	machine: M,
 	initial?: string,
+	ops: {
+		[k in keyof D]: {
+			[x: string]: (this: This, value: D[k], ...args: any) => D[k]
+		}
+	},
 }) {
-	const { actions, conditions, data, initial, machine } = options;
+	const { actions, conditions, data, initial, machine, ops } = options;
 
 	const states = Object.keys(machine.states);
 	const setters = Object
@@ -38,21 +53,26 @@ export function createMachine<M extends Machine, D extends Data>(options: {
 			}
 			sendParent(event, value);
 		},
-	};
+	} as This;
 
-	for (const value in data) {
-		if (Object.hasOwn(data, value)) {
-			Object.defineProperty(scope.data, value, {
-				get() {
-					return get(data[value].store);
-				},
-			});
-		}
+	const thingOps: { [x: string]: {
+        [x: string]: (...args: any) => void;
+    }} = Object.create(null);
+	const thingNames: string[] = [];
+	const thingStores: Readable<any>[] = [];
+	for (const [key, value] of Object.entries(data)) {
+		const { ops: ops2, store } = thing(value, ops[key]);
+		thingOps[key] = ops2;
+		thingNames.push(key);
+		thingStores.push(store);
+		Object.defineProperty(scope.data, key, {
+			get() {
+				return get(store);
+			},
+		});
 	}
 
-	const thingNames = Object.keys(data);
-	const things = Object.values(data).map((thing) => thing.store);
-	const merged = derived([state.store, ...things],
+	const merged = derived([state.store, ...thingStores],
         ([$state, ...$things]) => {
 			const entries = $things.map(($thing, i) => {
 				return [thingNames[i], $thing];
@@ -118,13 +138,14 @@ export function createMachine<M extends Machine, D extends Data>(options: {
 						const match = dataOpRE.exec(action);
 						if (match) {
 							const [_, value, op] =  match;
-							if (!Object.hasOwn(data, value)) {
+							console.log({ value, op, thingOps, thingStores })
+							if (!Object.hasOwn(thingOps, value)) {
 								throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
 							}
-							if (!Object.hasOwn(data[value].ops, op)) {
+							if (!Object.hasOwn(thingOps[value], op)) {
 								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
 							}
-							data[value].ops[op].call(scope, ...args);
+							thingOps[value][op].call(scope, ...args);
 						} else if (Object.hasOwn(actions, action)) {
 							actions[action].call(scope, ...args);
 						} else {

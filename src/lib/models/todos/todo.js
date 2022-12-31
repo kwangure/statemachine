@@ -1,6 +1,4 @@
 import { createMachine } from '$lib/machine/create';
-import { get } from 'svelte/store';
-import { thing } from '$lib/thing/thing';
 
 /**
     @param {{
@@ -11,21 +9,6 @@ import { thing } from '$lib/thing/thing';
     }} data
  */
 export function todo(data) {
-    const id = thing(data.id);
-    const title = thing(data.title, {
-        /** @returns {string} */
-        fromPrevTitle() { return this.data.prevTitle },
-        set: (_, newTitle) => newTitle,
-    });
-    const prevTitle = thing('', {
-        fromTitle() { return this.data.title },
-    });
-    const completed = thing(false, {
-        falsify: () => false,
-        toggle: (value) => !value,
-        truthify: () => true,
-    });
-
     const machine = {
         on: {
             DELETE: [{
@@ -105,27 +88,48 @@ export function todo(data) {
         },
     };
 
-    const actions = {
-        commit() {
-            this.sendParent('TODO.COMMIT')
-        },
-        delete() {
-            this.sendParent('TODO.DELETE', get(id.store))
-        },
-    };
-
-    const conditions = {
-        titleNotEmpty() {
-            return this.data.title.trim().length > 0;
-        },
-    };
-
-    const data2 = {
-        completed,
-        prevTitle,
-        title,
-    }
-
     return createMachine({
-        actions, conditions, data: data2, machine, initial: data.initial });
+        actions: {
+            commit() {
+                this.sendParent('TODO.COMMIT');
+            },
+            delete() {
+                this.sendParent('TODO.DELETE', this.data.id);
+            },
+        },
+        conditions: {
+            titleNotEmpty() {
+                return this.data.title.trim().length > 0;
+            },
+        },
+        data: {
+            id: data.id,
+            completed: false,
+            prevTitle: '',
+            title: data.title,
+        },
+        ops: {
+            id: {},
+            completed: {
+                falsify: () => false,
+                toggle: (value) => !value,
+                truthify: () => true,
+            },
+            prevTitle: {
+                fromTitle() {
+                    return this.data.title;
+                },
+            },
+            title: {
+                fromPrevTitle() {
+                    return this.data.prevTitle;
+                },
+                set(_, newTitle) {
+                    return newTitle;
+                },
+            },
+        },
+        machine,
+        initial: data.initial
+    });
 }
