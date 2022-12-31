@@ -1,18 +1,17 @@
-import type { Actions, Conditions, Data, Machine, Store, Thing, Transitions } from './types';
-import { get } from 'svelte/store';
+import type { Actions, Conditions, Data, Machine, Thing, Transitions } from './types';
+import { derived, get } from 'svelte/store';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 
 const dataOpRE = /^\$(\w+)\.(\w+)$/;
 
-export function createMachine<M extends Machine, S extends Store, D extends Data>(options: {
+export function createMachine<M extends Machine, D extends Data>(options: {
 	actions: Actions,
 	data: D,
 	conditions: Conditions,
 	machine: M,
 	state: Thing<string>,
-	store: S
 }) {
-	const { actions, conditions, data, machine, state, store } = options;
+	const { actions, conditions, data, machine, state } = options;
 
 	type MightHaveEventHandlers = M | M['states'][keyof M['states']];
 	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
@@ -45,9 +44,25 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 		}
 	}
 
-	store.createParentSender = (fn: (event: string, value?: any) => void) => {
-		if (typeof fn === 'function') sendParent = fn;
-	};
+	const thingNames = Object.keys(data);
+	const things = Object.values(data).map((thing) => thing.store);
+	const merged = derived([state.store, ...things],
+        ([$state, ...$things]) => {
+			const entries = $things.map(($thing, i) => {
+				return [thingNames[i], $thing];
+			});
+			const data = Object.fromEntries(entries);
+
+            return { data, state: $state };
+        });
+
+	const store = {
+		createParentSender: (fn: (event: string, value?: any) => void) => {
+			if (typeof fn === 'function') sendParent = fn;
+		},
+		destroy: () => {},
+		subscribe: merged.subscribe,
+	}
 
 	return (new Proxy(store, {
 		get(target, prop, receiver) {
@@ -116,9 +131,7 @@ export function createMachine<M extends Machine, S extends Store, D extends Data
 				}
 			}
 		},
-	})) as S & {
-		createParentSender: (fn: (event: string, value?: any) => void) => void
-	} & {
+	})) as typeof store & {
 		[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
 	};
 }

@@ -48,11 +48,5 @@ export interface Transitions {
 
 export type Machine = States & Transitions;
 
-export interface Store {
-	createParentSender?: (fn : (event: string, value?: any) => void) => void;
-	subscribe: Subscriber,
-	destroy: (...args: any) => any;
-}
-
 export type UnionToIntersection<U> =
 	(U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never

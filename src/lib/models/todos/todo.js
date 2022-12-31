@@ -1,5 +1,5 @@
-import { derived, get } from 'svelte/store';
 import { createMachine } from '$lib/machine/create';
+import { get } from 'svelte/store';
 import { thing } from '$lib/thing/thing';
 
 /**
@@ -30,21 +30,6 @@ export function todo(data) {
         toggle: (value) => !value,
         truthify: () => true,
     });
-
-    const merged = derived(
-        [completed.store, id.store, prevTitle.store, title.store, state.store],
-        ([$completed, $id, $prevTitle, $title, $state]) => {
-            return {
-                state: $state,
-                data: {
-                    completed: $completed,
-                    id: $id,
-                    prevTitle: $prevTitle,
-                    title: $title,
-                },
-            };
-        });
-    const { subscribe } = merged;
 
     const machine = {
         on: {
@@ -140,16 +125,11 @@ export function todo(data) {
         },
     };
 
-    const store = {
-        subscribe,
-        destroy() { },
-    };
-
     const data2 = {
         completed,
         prevTitle,
         title,
     }
 
-    return createMachine({ actions, conditions, data: data2, machine, state, store });
+    return createMachine({ actions, conditions, data: data2, machine, state });
 }
