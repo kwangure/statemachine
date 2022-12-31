@@ -26,17 +26,14 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 export function todos() {
-	// TODO: Add loading state to parse JSON
-	const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
-		JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
-	).map((todoJson) => todo(todoJson));
 	return createMachine({
-		initial: 'ready',
+		initial: 'loading',
 		machine: {
 			states: {
 				loading: {
-					always: [{
+					entry: [{
 						transitionTo: 'ready',
+						actions: ['$todos.load'],
 					}],
 				},
 				ready: {},
@@ -71,7 +68,7 @@ export function todos() {
 		},
 		data: {
 			newTodo: '',
-			todos: todosJson,
+			todos: /** @type {ReturnType<todo>[]} */([]),
 			filter: /** @type {'all' | 'active' | 'completed'} */('all'),
 		},
 		ops: {
@@ -110,6 +107,14 @@ export function todos() {
 				},
 				forceRerender($todos) {
 					return [...$todos];
+				},
+				load() {
+					// TODO: Add loading state to parse JSON
+					const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
+						JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
+					).map((todoJson) => todo(todoJson));
+
+					return todosJson;
 				}
 			},
 			filter: {

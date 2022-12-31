@@ -1,5 +1,5 @@
 import { derived, get, type Readable } from 'svelte/store';
-import type { Machine, Transitions } from './types';
+import type { Handler, Machine, Transitions } from './types';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
 
@@ -135,6 +135,62 @@ export function createMachine<
 		subscribe: merged.subscribe,
 	}
 
+	const $state = get(state.store);
+	executeHandlers(machine.states[$state].entry || []);
+
+	function executeHandlers(handlers: Handler<M, ActionList, keyof Conditions>[], ...args: any[]) {
+		for (const { actions: transitionActions = [], condition, transitionTo } of handlers) {
+			if (conditions && condition) {
+				const isSatisfied = conditions[condition].call(actionScope, ...args);
+				if (!isSatisfied) continue;
+			}
+
+			const actionQueue: ActionList[] = [];
+			function isDefined<T>(argument: T | undefined): argument is T {
+				return argument !== undefined
+			}
+			if (transitionTo && typeof transitionTo === 'string') {
+				const currentState = get(state.store);
+				const exitActions = machine.states[currentState].exit
+					?.map((handlers) => handlers.actions)
+					.filter(isDefined).flat() || [];
+				const entryActions = machine.states[currentState].entry
+					?.map((handlers) => handlers.actions)
+					.filter(isDefined).flat() || [];
+				actionQueue.push(...exitActions);
+				actionQueue.push(...transitionActions);
+				actionQueue.push(...entryActions);
+				if (!Object.hasOwn(state.ops, transitionTo)) {
+					throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
+				}
+				state.ops[transitionTo].call(actionScope);
+			} else {
+				actionQueue.push(...transitionActions || []);
+			}
+
+			for (const action of actionQueue as string[]) {
+				const match = dataOpRE.exec(action);
+				if (match) {
+					const [_, value, op] = match;
+					if (!Object.hasOwn(thingOps, value)) {
+						throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
+					}
+					if (!Object.hasOwn(thingOps[value], op)) {
+						throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
+					}
+					thingOps[value][op].call(actionScope, ...args);
+				} else if (actions && Object.hasOwn(actions, action)) {
+					actions[action].call(actionScope, ...args);
+				} else {
+					throw Error(`Attempted run to unknown action '${action}'`);
+				}
+			}
+
+			// Do not execute actions/transitions that follow a successful transition
+			if (transitionTo) break;
+		}
+	}
+
 	return (new Proxy(store, {
 		get(target, prop, receiver) {
 			if (Object.hasOwn(target, prop)) {
@@ -157,57 +213,7 @@ export function createMachine<
 					...(machine.states[$state].always || []),
 				];
 
-
-				for (const { actions: transitionActions, condition, transitionTo } of handlers) {
-					if (conditions && condition) {
-						const isSatisfied = conditions[condition].call(actionScope, ...args);
-						if (!isSatisfied) continue;
-					}
-
-					const actionQueue: ActionList[] = [];
-					function isDefined<T>(argument: T | undefined): argument is T {
-						return argument !== undefined
-					}
-					if (transitionTo && typeof transitionTo === 'string') {
-						const currentState = get(state.store);
-						const exitActions = machine.states[currentState].exit
-							?.map((handlers) => handlers.actions)
-							.filter(isDefined).flat() || [];
-						const entryActions = machine.states[currentState].entry
-							?.map((handlers) => handlers.actions)
-							.filter(isDefined).flat() || [];
-						actionQueue.push(...exitActions);
-						actionQueue.push(...transitionActions || []);
-						actionQueue.push(...entryActions);
-						if (!Object.hasOwn(state.ops, transitionTo)) {
-							throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
-						}
-						state.ops[transitionTo].call(actionScope);
-					} else {
-						actionQueue.push(...transitionActions || []);
-					}
-
-					for (const action of actionQueue as string[]) {
-						const match = dataOpRE.exec(action);
-						if (match) {
-							const [_, value, op] = match;
-							if (!Object.hasOwn(thingOps, value)) {
-								throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
-							}
-							if (!Object.hasOwn(thingOps[value], op)) {
-								throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
-							}
-							thingOps[value][op].call(actionScope, ...args);
-						} else if (actions && Object.hasOwn(actions, action)) {
-							actions[action].call(actionScope, ...args);
-						} else {
-							throw Error(`Attempted run to unknown action '${action}'`);
-						}
-					}
-
-					// Do not execute actions/transitions that follow a successful transition
-					if (transitionTo) break;
-				}
+				executeHandlers(handlers, ...args);
 			}
 		},
 	})) as typeof store & {

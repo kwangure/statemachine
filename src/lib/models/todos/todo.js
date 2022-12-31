@@ -25,7 +25,7 @@ export function todo(data) {
         },
         data: {
             id: data.id,
-            completed: false,
+            completed: data.completed,
             prevTitle: '',
             title: data.title,
         },
