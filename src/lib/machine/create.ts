@@ -127,14 +127,6 @@ export function createMachine<
 			return { data, state: $state };
 		});
 
-	const store = {
-		createParentSender: (fn: (event: string, value?: any) => void) => {
-			if (typeof fn === 'function') sendParent = fn;
-		},
-		destroy: () => { },
-		subscribe: merged.subscribe,
-	}
-
 	const $state = get(state.store);
 	executeHandlers(config.states[$state].entry || []);
 
@@ -154,7 +146,7 @@ export function createMachine<
 				const exitActions = config.states[currentState].exit
 					?.map((handlers) => handlers.actions)
 					.filter(isDefined).flat() || [];
-				const entryActions = config.states[currentState].entry
+				const entryActions = config.states[transitionTo].entry
 					?.map((handlers) => handlers.actions)
 					.filter(isDefined).flat() || [];
 				actionQueue.push(...exitActions);
@@ -191,32 +183,46 @@ export function createMachine<
 		}
 	}
 
-	return (new Proxy(store, {
-		get(target, prop, receiver) {
-			if (Object.hasOwn(target, prop)) {
-				return Reflect.get(target, prop, receiver);
-			}
-			const isEventListener = typeof prop === 'string'
-				&& prop.toUpperCase() === prop;
+	const handlerMap2: {
+		[x: string]:((...args: any) => void)[]
+	} = {}
+	for (let i = 0; i < states.length; i++) {
+		const listeners = {
+			// check for machine-level listener if config.states[state] doesn't exist
+			...config.on,
+			...config.states[states[i]].on,
+		};
 
-			if (!isEventListener) return;
-
-			return function (...args: any) {
-				const $state = get(state.store);
-				const listeners = {
-					// check for machine-level listener if machine.states[$state] doesn't exist
-					...config.on,
-					...config.states[$state].on,
-				};
-				const handlers = [
+		for (const prop in listeners) {
+			if (!handlerMap2[prop]) handlerMap2[prop] = [];
+			handlerMap2[prop].push((...args) => {
+				if (get(state.store) !== states[i]) return;
+				executeHandlers([
 					...(listeners[prop] ?? []),
-					...(config.states[$state].always || []),
-				];
+					...(config.states[states[i]].always || []),
+				], ...args);
+			});
+		}
+	};
+	const handlerMap = Object.fromEntries(
+		Object.entries(handlerMap2)
+			.map(([key, funcs]) => {
+				return [key, (...args: any) => funcs.forEach((fn) => fn(...args))];
+			}),
+	);
 
-				executeHandlers(handlers, ...args);
-			}
+	return {
+		...handlerMap,
+		createParentSender: (fn: (event: string, value?: any) => void) => {
+			if (typeof fn === 'function') sendParent = fn;
 		},
-	})) as typeof store & {
+		destroy: () => { },
+		subscribe: merged.subscribe,
+	} as {
+		createParentSender: (fn: (event: string, value?: any) => void) => void,
+		destroy: () => void,
+		subscribe: typeof merged.subscribe,
+	} & {
 		[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
 	};
 }
