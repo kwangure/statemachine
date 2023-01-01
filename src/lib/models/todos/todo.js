@@ -33,7 +33,9 @@ export function todo(data) {
             id: {},
             completed: {
                 falsify: () => false,
-                toggle: (value) => !value,
+                toggle() {
+                    return !this.data.completed;
+                },
                 truthify: () => true,
             },
             prevTitle: {
@@ -45,7 +47,7 @@ export function todo(data) {
                 fromPrevTitle() {
                     return this.data.prevTitle;
                 },
-                set(_, newTitle) {
+                set(newTitle) {
                     return newTitle;
                 },
             },

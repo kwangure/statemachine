@@ -5,7 +5,6 @@ import { thing } from '$lib/thing/thing';
 
 /**
 	TODO:
-	- Do not pass `data` value to ops as first argument, use `this` for everything for consistency
 	- Remove errors and rely on TypeScript??
 	- Replace `sendParent` w/ automatic bubbling
 		- First add `children` & `parent` properties to machines, simplify `sendParent`
@@ -57,7 +56,7 @@ export function createMachine<
 	},
 	O extends {
 		[k in keyof D]: {
-			[x: string]: (this: ActionScope, value: D[k], ...args: any) => D[k]
+			[x: string]: (this: ActionScope, ...args: any) => D[k]
 		}
 	}>(options: {
 		actions?: A,

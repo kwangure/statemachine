@@ -48,7 +48,7 @@ export function ticTacToe() {
 		},
 		ops: {
 			board: {
-				update(_, tile) {
+				update(tile) {
 					const updatedBoard = [...this.data.board];
 					updatedBoard[tile] = this.data.player;
 					return updatedBoard;

@@ -73,40 +73,40 @@ export function todos() {
 		},
 		ops: {
 			newTodo: {
-				update: (_, newValue) => newValue,
+				update: (newValue) => newValue,
 				empty: () => '',
 			},
 			todos: {
-				activateAll($todos) {
-					return $todos.map((todo) => {
+				activateAll() {
+					return this.data.todos.map((todo) => {
 						todo.emit.SET_ACTIVE();
 						return todo;
 					});
 				},
-				clearCompleted($todos) {
-					return $todos.filter((todo) => {
+				clearCompleted() {
+					return this.data.todos.filter((todo) => {
 						const $todo = get(todo);
 						if ($todo.data.completed) todo.destroy();
 						return !$todo.data.completed;
 					});
 				},
-				completeAll($todos) {
-					return $todos.map((todo) => {
+				completeAll() {
+					return this.data.todos.map((todo) => {
 						todo.emit.SET_COMPLETED();
 						return todo;
 					});
 				},
-				addNew($todos, title) {
+				addNew(title) {
 					const newTodo = todo(createNewTodo(title.trim()));
-					return [...$todos, newTodo];
+					return [...this.data.todos, newTodo];
 				},
-				delete($todos, deleted) {
-					return $todos.filter((todo) => {
+				delete(deleted) {
+					return this.data.todos.filter((todo) => {
 						return todo !== deleted;
-					});;
+					});
 				},
-				forceRerender($todos) {
-					return [...$todos];
+				forceRerender() {
+					return [...this.data.todos];
 				},
 				load() {
 					// TODO: Add loading state to parse JSON
@@ -118,7 +118,7 @@ export function todos() {
 				}
 			},
 			filter: {
-				update: (_, newFilter) => newFilter,
+				update: (newFilter) => newFilter,
 			},
 		},
 		computed: {
