@@ -4,7 +4,6 @@ import { createMachine } from '$lib/machine/create';
     @param {{
         completed: boolean;
         id: string;
-        initial?: 'deleted' | 'editing' | 'reading';
         title: string;
     }} data
  */
@@ -131,6 +130,5 @@ export function todo(data) {
                 },
             },
         },
-        initial: data.initial
     });
 }
