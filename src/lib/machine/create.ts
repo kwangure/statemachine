@@ -29,8 +29,8 @@ const dataOpRE = /^\$(\w+)\.(\w+)$/;
  *  Depth2Path<Ops, keyof Ops> === "$completed.toggle" | "$count.increment"`
  * ```
  */
-type Depth2Path<T, U extends keyof T> = U extends string
-	? keyof T[U] extends string
+type Depth2Path<T, U extends keyof T> = U extends string | number
+	? keyof T[U] extends string | number
 		? `$${U}.${keyof T[U]}`
 		: never
 	: never;
