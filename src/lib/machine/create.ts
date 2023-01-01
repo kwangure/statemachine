@@ -75,10 +75,6 @@ export function createMachine<
 		.fromEntries(states.map((state) => [state, () => state]))
 	const state = thing(initial as string || states[0], setters);
 
-	type MightHaveEventHandlers = C | C['states'][keyof C['states']];
-	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
-	type EventHandlers = HaveEventHandlers['on'];
-
 	let sendParent: (event: string, value?: any) => void;
 	const actionScope = {
 		data: Object.create(null),
@@ -204,6 +200,10 @@ export function createMachine<
 		}
 		handlerStateProps[states[i]] = listenerMap;
 	};
+
+	type MightHaveEventHandlers = C | C['states'][keyof C['states']];
+	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
+	type EventHandlers = HaveEventHandlers['on'];
 
 	class Machine {
 		emit: {
