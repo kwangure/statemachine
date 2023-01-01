@@ -13,7 +13,7 @@ import { thing } from '$lib/thing/thing';
 	- Explore asynchronous actions/events
  */
 
-const dataOpRE = /^\$(\w+)\.(\w+)$/;
+const dataOpRE = /^\$([_$\w]+)\.(\w+)$/;
 
 /**
  *
@@ -71,6 +71,7 @@ export function createMachine<
 	const nullo = () => Object.create(null);
 	const { actions, computed, conditions, data = nullo(), initial, config, ops = nullo() } = options;
 
+	const STATE = '__$$state';
 	const states = Object.keys(config.states);
 	const setters = Object
 		.fromEntries(states.map((state) => [state, () => state]))
@@ -115,6 +116,7 @@ export function createMachine<
 			},
 		});
 	}
+	thingOps[STATE] = state.ops;
 
 	const merged = derived([state.store, ...thingStores],
 		([$state, ...$things]) => {
@@ -140,37 +142,31 @@ export function createMachine<
 	const $state = get(state.store);
 	executeHandlers(config.states[$state].entry || []);
 
+	function isDefined<T>(argument: T | undefined): argument is T {
+		return argument !== undefined
+	}
 	function executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
-		for (const { actions: transitionActions = [], condition, transitionTo } of handlers) {
+		while (handlers.length) {
+			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
+			const { actions: transitionActions = [], condition, transitionTo } = handler;
 			if (conditions && condition) {
 				const isSatisfied = conditions[condition].call(actionScope, ...args);
 				if (!isSatisfied) continue;
 			}
 
-			const actionQueue: ActionList[] = [];
-			function isDefined<T>(argument: T | undefined): argument is T {
-				return argument !== undefined
-			}
-			if (transitionTo && typeof transitionTo === 'string') {
+			if (transitionTo) {
 				const currentState = get(state.store);
-				const exitActions = config.states[currentState].exit
-					?.map((handlers) => handlers.actions)
-					.filter(isDefined).flat() || [];
-				const entryActions = config.states[transitionTo].entry
-					?.map((handlers) => handlers.actions)
-					.filter(isDefined).flat() || [];
-				actionQueue.push(...exitActions);
-				actionQueue.push(...transitionActions);
-				actionQueue.push(...entryActions);
-				if (!Object.hasOwn(state.ops, transitionTo)) {
-					throw Error(`Attempted transition from '${get(state.store)}' to unknown state '${transitionTo}'`);
-				}
-				state.ops[transitionTo].call(actionScope);
-			} else {
-				actionQueue.push(...transitionActions || []);
+				handlers = [
+					...config.states[currentState].exit || [],
+					{ actions: transitionActions },
+					{ actions: [`$${STATE}.${transitionTo as string}` as ActionList]},
+					...config.states[transitionTo as string].entry || [],
+					...config.states[transitionTo as string].always || [],
+				].filter(isDefined);
+				continue;
 			}
 
-			for (const action of actionQueue as string[]) {
+			for (const action of transitionActions as string[]) {
 				const match = dataOpRE.exec(action);
 				if (match) {
 					const [_, value, op] = match;
@@ -187,9 +183,6 @@ export function createMachine<
 					throw Error(`Attempted run to unknown action '${action}'`);
 				}
 			}
-
-			// Do not execute actions/transitions that follow a successful transition
-			if (transitionTo) break;
 		}
 	}
 
