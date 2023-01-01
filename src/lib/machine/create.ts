@@ -5,7 +5,6 @@ import { thing } from '$lib/thing/thing';
 
 /**
 	TODO:
-	- Remove errors and rely on TypeScript??
 	- Replace `sendParent` w/ automatic bubbling
 		- First add `children` & `parent` properties to machines, simplify `sendParent`
 		- Then replace `sendParent` using these properties altogether
@@ -169,12 +168,6 @@ export function createMachine<
 				const match = dataOpRE.exec(action);
 				if (match) {
 					const [_, value, op] = match;
-					if (!Object.hasOwn(thingOps, value)) {
-						throw Error(`Attempted run to unknown action '${action}'. No data store named '${value}' was provided.`);
-					}
-					if (!Object.hasOwn(thingOps[value], op)) {
-						throw Error(`Attempted run to unknown action '${action}'. Data store '${value}' has no function '${op}'.`);
-					}
 					thingOps[value][op].call(actionScope, ...args);
 				} else if (actions && Object.hasOwn(actions, action)) {
 					actions[action].call(actionScope, ...args);
