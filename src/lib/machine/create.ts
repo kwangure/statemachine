@@ -3,6 +3,16 @@ import type { Config, Handler, Transitions } from './types';
 import type { SetRequired, UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
 
+/**
+	TODO:
+	- Do not pass `data` value to ops as first argument, use `this` for everything for consistency
+	- Remove errors and rely on TypeScript??
+	- Replace `sendParent` w/ automatic bubbling
+		- First add `children` & `parent` properties to machines, simplify `sendParent`
+		- Then replace `sendParent` using these properties altogether
+	- Explore asynchronous actions/events
+ */
+
 const dataOpRE = /^\$(\w+)\.(\w+)$/;
 
 /**
