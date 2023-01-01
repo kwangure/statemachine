@@ -1,126 +1,126 @@
-import { derived, get, writable } from "svelte/store";
 import { createMachine } from "$lib/machine/create";
 
 export function ticTacToe() {
-	/** @type {import('svelte/store').Writable<('X' | 'O' | null)[]>} */
-	const board = writable(Array(9).fill(null));
-
-	/** @type {import('svelte/store').Writable<'playing' | 'winner' | 'draw'>} */
-	const state = writable('playing');
-	const moves = writable(0);
-	/** @type {import('svelte/store').Writable<'X' | 'O'>} */
-	const player = writable('X');
-	const winner = writable();
-	const merged = derived(
-		[board, moves, player, state, winner],
-		([$board, $moves, $player, $state, $winner]) => {
-			return {
-				state: $state,
-				data: {
-					board: $board,
-					moves: $moves,
-					player: $player,
-					winner: $winner,
-				},
-			};
-		});
-
-	const { subscribe } = merged;
-
-	const store = {
-		subscribe,
-		destroy() { },
-	}
-
-	const conditions = {
-		checkWin: () => {
-			const $board = get(board);
-			const winningLines = [
-				[0, 1, 2],
-				[3, 4, 5],
-				[6, 7, 8],
-				[0, 3, 6],
-				[1, 4, 7],
-				[2, 5, 8],
-				[0, 4, 8],
-				[2, 4, 6]
-			];
-
-			for (let line of winningLines) {
-				const xWon = line.every(index => {
-					return $board[index] === 'X';
-				});
-
-				if (xWon) return true;
-
-				const oWon = line.every(index => {
-					return $board[index] === 'O';
-				});
-
-				if (oWon) return true;
-			}
-
-			return false;
+	return createMachine({
+		initial: 'playing',
+		data: {
+			board: /** @type {('X' | 'O' | null)[]} */(Array(9).fill(null)),
+			move: 0,
+			player: /** @type {('X' | 'O')} */('X'),
+			winner: /** @type {('X' | 'O' | undefined)} */(undefined),
 		},
-		checkDraw: () => get(moves) === 9,
-		/** @param {number} tile */
-		isValidMove: (tile) => {
-			return get(board)[tile] === null
-		}
-	};
-	const machine = {
-		states: {
-			playing: {
-				always: [
-					{ transitionTo: "winner", condition: "checkWin" },
-					{ transitionTo: "draw", condition: "checkDraw" },
-				],
-				on: {
-					PLAY: [
-						{
-							transitionTo: "playing",
-							condition: "isValidMove",
-							actions: ["updateBoard"],
-						},
-					],
+		conditions: {
+			checkWin() {
+				const winningLines = [
+					[0, 1, 2],
+					[3, 4, 5],
+					[6, 7, 8],
+					[0, 3, 6],
+					[1, 4, 7],
+					[2, 5, 8],
+					[0, 4, 8],
+					[2, 4, 6]
+				];
+
+				for (let line of winningLines) {
+					const xWon = line.every(index => {
+						return this.data.board[index] === 'X';
+					});
+
+					if (xWon) return true;
+
+					const oWon = line.every(index => {
+						return this.data.board[index] === 'O';
+					});
+
+					if (oWon) return true;
+				}
+
+				return false;
+			},
+			checkDraw() {
+				console.log('check draw');
+				return this.data.move === 9;
+			},
+			isValidMove(tile) {
+				return this.data.board[tile] === null;
+			}
+		},
+		ops: {
+			board: {
+				update(_, tile) {
+					const updatedBoard = [...this.data.board];
+					updatedBoard[tile] = this.data.player;
+					return updatedBoard;
 				},
+				reset() {
+					return Array(9).fill(null);
+				},
+			},
+			move: {
+				increment() {
+					return this.data.move + 1;
+				},
+				reset() {
+					return 0;
+				},
+			},
+			player: {
+				update() {
+					return this.data.player === 'X' ? 'O' : 'X';
+				},
+				reset() {
+					return 'X';
+				}
 			},
 			winner: {
-				entry: {
-					actions: ["setWinner"],
+				update() {
+					return this.data.player === 'X' ? 'O' : 'X';
 				},
+				reset() {
+					return undefined;
+				}
 			},
-			draw: {},
 		},
-		on: {
-			RESET: [{
-				transitionTo: "playing",
-				actions: ["resetGame"],
-			}],
+		config: {
+			states: {
+				playing: {
+					always: [
+						{ transitionTo: "winner", condition: "checkWin" },
+						{ transitionTo: "draw", condition: "checkDraw" },
+					],
+					on: {
+						PLAY: [
+							{
+								transitionTo: "playing",
+								condition: "isValidMove",
+								actions: [
+									"$board.update",
+									"$move.increment",
+									"$player.update",
+								],
+							},
+						],
+					},
+				},
+				winner: {
+					entry: [{
+						actions: ["$winner.update"],
+					}],
+				},
+				draw: {},
+			},
+			on: {
+				RESET: [{
+					transitionTo: "playing",
+					actions: [
+						"$board.reset",
+						"$move.reset",
+						"$player.reset",
+						"$winner.reset",
+					],
+				}],
+			},
 		},
-	};
-	const actions = {
-		/**
-		 * @param {number} tile
-		 */
-		updateBoard: (tile) => {
-			board.update(($board) => {
-				const updatedBoard = [...$board];
-				updatedBoard[tile] = get(player);
-				return updatedBoard;
-			});
-			moves.update(($moves) => $moves + 1);
-			player.update(($player) => $player === 'X' ? 'O' : 'X');
-		},
-		resetGame: () => {
-			board.set(Array(9).fill(null));
-			state.set('playing');
-			moves.set(0);
-			player.set('X');
-			winner.set(undefined);
-		},
-		setWinner: () => winner.update(() => get(player) === 'X' ? 'O' : 'X')
-	}
-
-	return createMachine({ actions, conditions, config: machine, state, store })
+	});
 }
