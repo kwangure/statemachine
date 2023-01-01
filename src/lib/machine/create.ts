@@ -220,18 +220,21 @@ export function createMachine<
 		handlerStateProps[states[i]] = listenerMap;
 	};
 
-	return {
-		...handlerMap,
-		createParentSender: (fn: (event: string, value?: any) => void) => {
-			if (typeof fn === 'function') sendParent = fn;
-		},
-		destroy: () => { },
-		subscribe: merged.subscribe,
-	} as {
-		createParentSender: (fn: (event: string, value?: any) => void) => void,
-		destroy: () => void,
-		subscribe: typeof merged.subscribe,
-	} & {
-		[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
-	};
+	class Machine {
+		emit: {
+			[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
+		};
+		constructor() {
+			this.emit = handlerMap;
+		}
+		createParentSender(fn: (event: string, value?: any) => void) {
+			sendParent = fn;
+		}
+		destroy() { }
+		get subscribe() {
+			return merged.subscribe;
+		}
+	}
+
+	return new Machine();
 }

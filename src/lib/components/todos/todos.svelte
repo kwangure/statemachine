@@ -6,7 +6,7 @@
 	/** @type {ReturnType<import('$lib/models/todos').todos>} */
 	export let todos;
 
-	$: todos.SHOW(filter);
+	$: todos.emit.SHOW(filter);
 </script>
 
 <section class="todoapp" data-state={$todos}>
@@ -14,21 +14,21 @@
 	  	<h1>todos</h1>
 	  	<!-- svelte-ignore a11y-autofocus -->
 	  	<input class="new-todo" placeholder="What needs to be done?" autofocus
-			on:keypress={(event) => (event.key === "Enter") ? todos["NEWTODO.COMMIT"](event.currentTarget.value) : void 0}
-			on:input={(event) => todos["NEWTODO.CHANGE"](event.currentTarget.value)}
+			on:keypress={(event) => (event.key === "Enter") ? todos.emit["NEWTODO.COMMIT"](event.currentTarget.value) : void 0}
+			on:input={(event) => todos.emit["NEWTODO.CHANGE"](event.currentTarget.value)}
 			value={$todos.data.newTodo}/>
 	</header>
 	<section class="main">
 	  	<input id="toggle-all" class="toggle-all" type="checkbox" checked={$todos.data.allCompleted}
-			on:change={(e) => ($todos.data.allCompleted ? todos[`MARK.ACTIVE`] : todos["MARK.COMPLETED"])()}/>
+			on:change={(e) => ($todos.data.allCompleted ? todos.emit[`MARK.ACTIVE`] : todos.emit["MARK.COMPLETED"])()}/>
 		<label for="toggle-all" title={`Mark all as ${$todos.data.markAllAs}`}>
 			Mark all as {$todos.data.markAllAs}
 		</label>
 		<ul class="todo-list">
 			{#each $todos.data.filteredTodos as todo}
 				<Todo todo={todo}
-					on:TODO.COMMIT={todos['TODO.COMMIT']}
-					on:TODO.DELETE={() => todos['TODO.DELETE'](todo)}/>
+					on:TODO.COMMIT={todos.emit['TODO.COMMIT']}
+					on:TODO.DELETE={() => todos.emit['TODO.DELETE'](todo)}/>
 			{/each}
 		</ul>
 	</section>
@@ -55,7 +55,7 @@
 			</li>
 		</ul>
 		{#if $todos.data.activeTodos.length < $todos.data.todos.length}
-			<button on:click={todos.CLEAR_COMPLETED} class="clear-completed">
+			<button on:click={todos.emit.CLEAR_COMPLETED} class="clear-completed">
 				Clear completed
 			</button>
 		{/if}

@@ -29,18 +29,18 @@
 	class:completed={$todo.data.completed}
 	data-todo-state={$todo.data.completed ? "completed" : "active"}>
     <div class="view">
-		<input id={$todo.data.id} class="toggle" type="checkbox" on:change={todo.TOGGLE_COMPLETE} checked={$todo.data.completed}/>
-        <div class='label' on:dblclick={todo.EDIT}>
+		<input id={$todo.data.id} class="toggle" type="checkbox" on:change={todo.emit.TOGGLE_COMPLETE} checked={$todo.data.completed}/>
+        <div class='label' on:dblclick={todo.emit.EDIT}>
 			{$todo.data.title}
 		</div>
-        <button class="destroy" on:click={todo.DELETE} />
+        <button class="destroy" on:click={todo.emit.DELETE} />
     </div>
     <input class="edit" value={$todo.data.title} use:focus={$todo.state}
-		on:blur={todo.BLUR}
+		on:blur={todo.emit.BLUR}
         on:input={(/** @type {Event & {
 			currentTarget: EventTarget & HTMLInputElement;
-		}}*/ event) => todo.CHANGE(event.currentTarget.value)}
-        on:keypress={(/** @type {KeyboardEvent} */ event) => (event.key === "Enter") ? todo.COMMIT() : void 0}
-        on:keydown={(/** @type {KeyboardEvent} */ event) => event.key === "Escape" ? todo.CANCEL() : void 0}
+		}}*/ event) => todo.emit.CHANGE(event.currentTarget.value)}
+        on:keypress={(/** @type {KeyboardEvent} */ event) => (event.key === "Enter") ? todo.emit.COMMIT() : void 0}
+        on:keydown={(/** @type {KeyboardEvent} */ event) => event.key === "Escape" ? todo.emit.CANCEL() : void 0}
     />
 </li>

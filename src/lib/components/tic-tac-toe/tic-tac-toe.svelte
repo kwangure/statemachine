@@ -13,13 +13,13 @@
 			Draw
 		{/if}
 		{#if $ticTacToe.state === 'winner' || $ticTacToe.state === 'draw'}
-			<button on:click={ticTacToe.RESET}>Reset</button>
+			<button on:click={ticTacToe.emit.RESET}>Reset</button>
 		{/if}
 	</h2>
 	<div class="grid">
 		{#each $ticTacToe.data.board as tile, i}
 			<!-- svelte-ignore a11y-click-events-have-key-events -->
-			<div class="tile player-{tile?.toLowerCase()}" on:click={() => ticTacToe.PLAY(i)}
+			<div class="tile player-{tile?.toLowerCase()}" on:click={() => ticTacToe.emit.PLAY(i)}
 				data-testid={`square-${i}`}></div>
 		{/each}
 	</div>

@@ -79,7 +79,7 @@ export function todos() {
 			todos: {
 				activateAll($todos) {
 					return $todos.map((todo) => {
-						todo.SET_ACTIVE();
+						todo.emit.SET_ACTIVE();
 						return todo;
 					});
 				},
@@ -92,7 +92,7 @@ export function todos() {
 				},
 				completeAll($todos) {
 					return $todos.map((todo) => {
-						todo.SET_COMPLETED();
+						todo.emit.SET_COMPLETED();
 						return todo;
 					});
 				},
