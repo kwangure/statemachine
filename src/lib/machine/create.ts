@@ -37,10 +37,8 @@ export function createMachine<
 	ActionList extends Depth2Path<O, keyof O> | keyof A,
 	C extends Config<C, ActionList, keyof Conditions>,
 	D extends { [key: string]: any },
-	ActionScope extends {
-		data: { [key in keyof D]: D[key] };
+	ActionScope extends ComputedScope & {
 		sendParent: (event: string, value?: any) => void;
-		state: keyof C['states'],
 	},
 	ComputedScope extends {
 		data: { [key in keyof D]: D[key] };
@@ -53,7 +51,7 @@ export function createMachine<
 		[x: string]: (this: ComputedScope, ...args: any) => any;
 	},
 	Conditions extends {
-		[x: string]: (this: ActionScope, ...args: any) => boolean;
+		[x: string]: (this: ComputedScope, ...args: any) => boolean;
 	},
 	O extends {
 		[k in keyof D]: {
@@ -78,24 +76,12 @@ export function createMachine<
 	const state = thing(initial || states[0], setters);
 
 	let sendParent: (event: string, value?: any) => void;
-	const actionScope = {
+	const computedScope = {
 		data: Object.create(null),
-		sendParent(event: string, value: any) {
-			if (!sendParent) {
-				throw Error([
-					'Attempted to call \'sendParent\' before assigning a parent sender.',
-					'Usage:',
-					'    store.createParentSender((event, value) => {',
-					'        dispatch(event, value);',
-					'    });',
-				].join('\n'));
-			}
-			sendParent(event, value);
-		},
 		get state() {
 			return get(state.store);
 		},
-	} as ActionScope;
+	} as ComputedScope;
 
 	const thingOps: {
 		[x: string]: {
@@ -109,7 +95,7 @@ export function createMachine<
 		thingOps[key] = ops2;
 		thingNames.push(key);
 		thingStores.push(store);
-		Object.defineProperty(actionScope.data, key, {
+		Object.defineProperty(computedScope.data, key, {
 			get() {
 				return get(store);
 			},
@@ -148,7 +134,7 @@ export function createMachine<
 		while (handlers.length) {
 			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
 			if (conditions && handler.condition) {
-				const isSatisfied = conditions[handler.condition].call(actionScope, ...args);
+				const isSatisfied = conditions[handler.condition].call(computedScope, ...args);
 				if (!isSatisfied) continue;
 			}
 
@@ -160,7 +146,7 @@ export function createMachine<
 				handlers = [
 					...config.states[currentState].exit || [],
 					{ actions: transitionActions },
-					{ actions: [`$${STATE}.${transitionTo as string}` as ActionList] },
+					{ actions: [`$${STATE}.${String(transitionTo)}` as ActionList] },
 					...config.states[transitionTo].entry || [],
 					...config.states[transitionTo].always || [],
 				].filter(isDefined);
@@ -171,9 +157,23 @@ export function createMachine<
 				const match = dataOpRE.exec(action);
 				if (match) {
 					const [_, value, op] = match;
-					thingOps[value][op].call(actionScope, ...args);
+					thingOps[value][op].call(computedScope, ...args);
 				} else if (actions && Object.hasOwn(actions, action)) {
-					actions[action].call(actionScope, ...args);
+					actions[action].call({
+						...computedScope,
+						sendParent(event: string, value: any) {
+							if (!sendParent) {
+								throw Error([
+									'Attempted to call \'sendParent\' before assigning a parent sender.',
+									'Usage:',
+									'    store.createParentSender((event, value) => {',
+									'        dispatch(event, value);',
+									'    });',
+								].join('\n'));
+							}
+							sendParent(event, value);
+						},
+					} as ActionScope, ...args);
 				} else {
 					throw Error(`Attempted run to unknown action '${action}'`);
 				}
