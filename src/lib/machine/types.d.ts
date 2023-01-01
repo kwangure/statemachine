@@ -27,8 +27,14 @@ export type Config<C, A, Condition> = {
 				[k: string]: Handler<C, A, Condition>[],
 			}
 			always?: Handler<C, A, Condition>[],
-			entry?: Handler<C, A, Condition>[],
-			exit?: Handler<C, A, Condition>[],
+			entry?: {
+				actions?: A[],
+				condition?: Condition,
+			}[],
+			exit?: {
+				actions?: A[],
+				condition?: Condition,
+			}[],
 		},
 	},
 	on?: {
