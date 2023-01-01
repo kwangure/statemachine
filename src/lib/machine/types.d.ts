@@ -21,22 +21,20 @@ export interface Transitions<C extends Config = Config, A extends string = strin
 };
 
 export type Config<C, A, Condition> = {
-	states: {
-		[k: string]: {
-			on?: {
-				[k: string]: Handler<C, A, Condition>[],
-			}
-			always?: Handler<C, A, Condition>[],
-			entry?: {
-				actions?: A[],
-				condition?: Condition,
-			}[],
-			exit?: {
-				actions?: A[],
-				condition?: Condition,
-			}[],
-		},
-	},
+	states: Record<keyof C['states'], {
+		on?: {
+			[k: string]: Handler<C, A, Condition>[],
+		}
+		always?: Handler<C, A, Condition>[],
+		entry?: {
+			actions?: A[],
+			condition?: Condition,
+		}[],
+		exit?: {
+			actions?: A[],
+			condition?: Condition,
+		}[],
+	}>,
 	on?: {
 		[k: string]: Handler<C, A, Condition>[],
 	},

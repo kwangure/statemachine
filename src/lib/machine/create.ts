@@ -40,9 +40,11 @@ export function createMachine<
 	ActionScope extends {
 		data: { [key in keyof D]: D[key] };
 		sendParent: (event: string, value?: any) => void;
+		state: keyof C['states'],
 	},
 	ComputedScope extends {
 		data: { [key in keyof D]: D[key] };
+		state: keyof C['states'],
 	},
 	A extends {
 		[x: string]: (this: ActionScope, ...args: any) => any;
@@ -70,10 +72,10 @@ export function createMachine<
 	const { actions, computed, conditions, data = nullo(), initial, config, ops = nullo() } = options;
 
 	const STATE = '__$$state';
-	const states = Object.keys(config.states);
+	const states = Object.keys(config.states) as (keyof C['states'])[];
 	const setters = Object
 		.fromEntries(states.map((state) => [state, () => state]))
-	const state = thing(initial as string || states[0], setters);
+	const state = thing(initial || states[0], setters);
 
 	let sendParent: (event: string, value?: any) => void;
 	const actionScope = {
@@ -89,6 +91,9 @@ export function createMachine<
 				].join('\n'));
 			}
 			sendParent(event, value);
+		},
+		get state() {
+			return get(state.store);
 		},
 	} as ActionScope;
 
@@ -125,7 +130,7 @@ export function createMachine<
 				const computedEntries = Object
 					.entries(computed)
 					.map(([funcName, func]) => {
-						return [funcName, { get: () => func.call({ data } as ComputedScope) }]
+						return [funcName, { get: () => func.call({ data, state: $state } as ComputedScope) }]
 					});
 				Object.defineProperties(data, Object.fromEntries(computedEntries));
 			}
@@ -142,20 +147,22 @@ export function createMachine<
 	function executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
 		while (handlers.length) {
 			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
-			const { actions: transitionActions = [], condition, transitionTo } = handler;
-			if (conditions && condition) {
-				const isSatisfied = conditions[condition].call(actionScope, ...args);
+			if (conditions && handler.condition) {
+				const isSatisfied = conditions[handler.condition].call(actionScope, ...args);
 				if (!isSatisfied) continue;
 			}
+
+			const transitionActions = handler.actions || [];
+			const transitionTo = handler.transitionTo;
 
 			if (transitionTo) {
 				const currentState = get(state.store);
 				handlers = [
 					...config.states[currentState].exit || [],
 					{ actions: transitionActions },
-					{ actions: [`$${STATE}.${transitionTo as string}` as ActionList]},
-					...config.states[transitionTo as string].entry || [],
-					...config.states[transitionTo as string].always || [],
+					{ actions: [`$${STATE}.${transitionTo as string}` as ActionList] },
+					...config.states[transitionTo].entry || [],
+					...config.states[transitionTo].always || [],
 				].filter(isDefined);
 				continue;
 			}
