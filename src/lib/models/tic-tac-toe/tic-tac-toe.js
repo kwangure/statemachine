@@ -1,8 +1,7 @@
-import { createMachine } from "$lib/machine/create";
+import { Machine } from "$lib/machine/create";
 
 export function ticTacToe() {
-	return createMachine({
-		initial: 'playing',
+	return new Machine({
 		data: {
 			board: /** @type {('X' | 'O' | null)[]} */(Array(9).fill(null)),
 			move: 0,

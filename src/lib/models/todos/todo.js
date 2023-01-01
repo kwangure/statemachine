@@ -1,4 +1,4 @@
-import { createMachine } from '$lib/machine/create';
+import { Machine } from '$lib/machine/create';
 
 /**
     @param {{
@@ -8,7 +8,7 @@ import { createMachine } from '$lib/machine/create';
     }} data
  */
 export function todo(data) {
-    return createMachine({
+    return new Machine({
         actions: {
             commit() {
                 this.sendParent('TODO.COMMIT');

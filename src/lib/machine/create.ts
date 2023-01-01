@@ -33,108 +33,153 @@ type Depth2Path<T, U extends keyof T> = U extends string | number
 		: never
 	: never;
 
-export function createMachine<
-	ActionList extends Depth2Path<O, keyof O> | keyof A,
+const STATE = '__$$state';
+
+function isDefined<T>(argument: T | undefined): argument is T {
+	return argument !== undefined
+}
+
+const nullo = () => Object.create(null);
+
+type MightHaveEventHandlers<C extends Config<C>> = C | C['states'][keyof C['states']];
+type HaveEventHandlers<C extends Config<C>> = Extract<MightHaveEventHandlers<C>, SetRequired<Transitions, 'on'>>;
+type EventHandlers<C extends Config<C>> = HaveEventHandlers<C>['on'];
+
+export class Machine<
+	ActionList extends Depth2Path<Ops, keyof Ops> | keyof Actions,
 	C extends Config<C, ActionList, keyof Conditions>,
-	D extends { [key: string]: any },
-	ActionScope extends ComputedScope & {
+	Data extends { [key: string]: any },
+	// Unfortunately we have to manually type `this` for non-static member
+	// of the class. I don't think there's a way to pass it automatically?
+	This extends {
+		data: { [key in keyof Data]: Data[key] };
+		emit: {
+			[key in keyof UnionToIntersection<EventHandlers<C>>]: (...args: any) => any
+		},
 		sendParent: (event: string, value?: any) => void;
-	},
-	ComputedScope extends {
-		data: { [key in keyof D]: D[key] };
 		state: keyof C['states'],
 	},
-	A extends {
-		[x: string]: (this: ActionScope, ...args: any) => any;
+	Actions extends {
+		[x: string]: (this: This, ...args: any) => any;
 	},
 	Computed extends {
-		[x: string]: (this: ComputedScope, ...args: any) => any;
+		[x: string]: (this: This, ...args: any) => any;
 	},
 	Conditions extends {
-		[x: string]: (this: ComputedScope, ...args: any) => boolean;
+		[x: string]: (this: This, ...args: any) => boolean;
 	},
-	O extends {
-		[k in keyof D]: {
-			[x: string]: (this: ActionScope, ...args: any) => D[k]
+	Ops extends {
+		[k in keyof Data]: {
+			[x: string]: (this: This, ...args: any) => Data[k]
 		}
-	}>(options: {
-		actions?: A,
-		data?: D,
+	}> {
+	#actions: Actions | undefined;
+	#conditions: Conditions | undefined;
+	#config: C;
+	#data: ReturnType<typeof derived<Readable<any>[], {
+		data: Data & { [key in keyof Computed]: ReturnType<Computed[key]>; };
+		state: keyof C["states"];
+	}>>
+	#sendParent: ((event: string, value?: any) => void) | null = null;
+	#thingOps: any;
+
+	emit: {
+		[key in keyof UnionToIntersection<EventHandlers<C>>]: (...args: any) => any
+	};
+
+	constructor(options: {
+		actions?: Actions,
+		data?: Data,
 		conditions?: Conditions,
 		computed?: Computed,
 		config: C,
 		initial?: keyof C['states'],
-		ops?: O,
+		ops?: Ops,
 	}) {
-	const nullo = () => Object.create(null);
-	const { actions, computed, conditions, data = nullo(), initial, config, ops = nullo() } = options;
+		this.#actions = options.actions;
+		this.#conditions = options.conditions;
+		this.#config = options.config;
 
-	const STATE = '__$$state';
-	const states = Object.keys(config.states) as (keyof C['states'])[];
-	const setters = Object
-		.fromEntries(states.map((state) => [state, () => state]))
-	const state = thing(initial || states[0], setters);
+		const states = (Object.keys(this.#config.states) as (keyof C['states'])[])
+		const setters = Object
+			.fromEntries(states.map((state) => [state, () => state]))
+		const state = thing(options.initial || states[0], setters);
 
-	let sendParent: (event: string, value?: any) => void;
-	const computedScope = {
-		data: Object.create(null),
-		get state() {
-			return get(state.store);
-		},
-	} as ComputedScope;
+		this.#thingOps = Object.create({ [STATE]: state.ops });
+		const thingNames: string[] = [];
+		const thingStores: Readable<any>[] = [state.store];
 
-	const thingOps: {
-		[x: string]: {
-			[x: string]: (...args: any) => void;
-		}
-	} = Object.create(null);
-	const thingNames: string[] = [];
-	const thingStores: Readable<any>[] = [];
-	for (const [key, value] of Object.entries(data)) {
-		const { ops: ops2, store } = thing(value, ops[key]);
-		thingOps[key] = ops2;
-		thingNames.push(key);
-		thingStores.push(store);
-		Object.defineProperty(computedScope.data, key, {
-			get() {
-				return get(store);
-			},
-		});
-	}
-	thingOps[STATE] = state.ops;
+		this.#data = derived(thingStores,
+			(thingStoreValues) => {
+				let $state: keyof C['states'];
+				let $things: any[];
+				[$state, ...$things] = thingStoreValues;
+				const entries = $things.map(($thing, i) => {
+					return [thingNames[i], $thing];
+				});
+				const data: Data & {
+					[key in keyof Computed]: ReturnType<Computed[key]>;
+				} = Object.fromEntries(entries);
 
-	const merged = derived([state.store, ...thingStores],
-		([$state, ...$things]) => {
-			const entries = $things.map(($thing, i) => {
-				return [thingNames[i], $thing];
+				if (options.computed) {
+					const computedEntries = Object
+						.entries(options.computed)
+						.map(([funcName, func]) => {
+							return [funcName, { get: () => func.call(this as unknown as This) }]
+						});
+					Object.defineProperties(data, Object.fromEntries(computedEntries));
+				}
+
+				return { data, state: $state };
 			});
-			const data: D & {
-				[key in keyof Computed]: ReturnType<Computed[key]>;
-			} = Object.fromEntries(entries);
-
-			if (computed) {
-				const computedEntries = Object
-					.entries(computed)
-					.map(([funcName, func]) => {
-						return [funcName, { get: () => func.call({ data, state: $state } as ComputedScope) }]
-					});
-				Object.defineProperties(data, Object.fromEntries(computedEntries));
+		const ops = options.ops || nullo();
+		for (const [key, value] of Object.entries(options.data || nullo())) {
+			const { ops: ops2, store } = thing(value, ops[key]);
+			this.#thingOps[key] = ops2;
+			thingNames.push(key);
+			thingStores.push(store);
+		}
+		const handlerStateProps = nullo();
+		const handlerMap = nullo();
+		const self = this;
+		for (let i = 0; i < states.length; i++) {
+			const listeners = {
+				// check for machine-level listener if config.states[state] doesn't exist
+				...this.#config.on,
+				...this.#config.states[states[i]].on,
+			};
+			const listenerMap = nullo();
+			for (const prop in listeners) {
+				listenerMap[prop] = (...args: any) => {
+					this.executeHandlers([
+						...(listeners[prop] ?? []),
+						...(this.#config.states[states[i]].always || []),
+					], ...args);
+				}
+				if (!Object.hasOwn(handlerMap, prop)) {
+					handlerMap[prop] = function (...args: any) {
+						handlerStateProps[self.state][prop]?.(...args);
+					}
+				}
 			}
+			handlerStateProps[states[i]] = listenerMap;
+		};
 
-			return { data, state: $state };
-		});
-
-	const $state = get(state.store);
-	executeHandlers(config.states[$state].entry || []);
-
-	function isDefined<T>(argument: T | undefined): argument is T {
-		return argument !== undefined
+		this.emit = handlerMap;
+		this.executeHandlers(this.#config.states[this.state].entry || [])
 	}
-	function executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
+	createParentSender(fn: (event: string, value?: any) => void) {
+		this.#sendParent = fn;
+	}
+	get data() {
+		return get(this.#data).data;
+	}
+	destroy() { }
+	executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
 		while (handlers.length) {
 			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
-			if (conditions && handler.condition) {
-				const isSatisfied = conditions[handler.condition].call(computedScope, ...args);
+			if (this.#conditions && handler.condition) {
+				const isSatisfied = this.#conditions[handler.condition].call(this as unknown as This, ...args);
 				if (!isSatisfied) continue;
 			}
 
@@ -142,13 +187,12 @@ export function createMachine<
 			const transitionTo = handler.transitionTo;
 
 			if (transitionTo) {
-				const currentState = get(state.store);
 				handlers = [
-					...config.states[currentState].exit || [],
+					...this.#config.states[this.state].exit || [],
 					{ actions: transitionActions },
 					{ actions: [`$${STATE}.${String(transitionTo)}` as ActionList] },
-					...config.states[transitionTo].entry || [],
-					...config.states[transitionTo].always || [],
+					...this.#config.states[transitionTo].entry || [],
+					...this.#config.states[transitionTo].always || [],
 				].filter(isDefined);
 				continue;
 			}
@@ -157,76 +201,32 @@ export function createMachine<
 				const match = dataOpRE.exec(action);
 				if (match) {
 					const [_, value, op] = match;
-					thingOps[value][op].call(computedScope, ...args);
-				} else if (actions && Object.hasOwn(actions, action)) {
-					actions[action].call({
-						...computedScope,
-						sendParent(event: string, value: any) {
-							if (!sendParent) {
-								throw Error([
-									'Attempted to call \'sendParent\' before assigning a parent sender.',
-									'Usage:',
-									'    store.createParentSender((event, value) => {',
-									'        dispatch(event, value);',
-									'    });',
-								].join('\n'));
-							}
-							sendParent(event, value);
-						},
-					} as ActionScope, ...args);
+					this.#thingOps[value][op].call(this as unknown as This, ...args);
+				} else if (this.#actions && Object.hasOwn(this.#actions, action)) {
+					this.#actions[action].call(this as unknown as This, ...args);
 				} else {
 					throw Error(`Attempted run to unknown action '${action}'`);
 				}
 			}
 		}
 	}
-
-	const handlerStateProps = nullo();
-	const handlerMap = nullo();
-	for (let i = 0; i < states.length; i++) {
-		const listeners = {
-			// check for machine-level listener if config.states[state] doesn't exist
-			...config.on,
-			...config.states[states[i]].on,
-		};
-
-		const listenerMap = nullo();
-		for (const prop in listeners) {
-			listenerMap[prop] = (...args: any) => {
-				executeHandlers([
-					...(listeners[prop] ?? []),
-					...(config.states[states[i]].always || []),
-				], ...args);
-			}
-			if (!Object.hasOwn(handlerMap, prop)) {
-				handlerMap[prop] = function (...args: any) {
-					const $state = get(state.store);
-					handlerStateProps[$state][prop]?.(...args);
-				}
-			}
+	sendParent(event: string, value: any) {
+		if (!this.#sendParent) {
+			throw Error([
+				'Attempted to call \'sendParent\' before assigning a parent sender.',
+				'Usage:',
+				'    store.createParentSender((event, value) => {',
+				'        dispatch(event, value);',
+				'    });',
+			].join('\n'));
 		}
-		handlerStateProps[states[i]] = listenerMap;
-	};
-
-	type MightHaveEventHandlers = C | C['states'][keyof C['states']];
-	type HaveEventHandlers = Extract<MightHaveEventHandlers, SetRequired<Transitions, 'on'>>;
-	type EventHandlers = HaveEventHandlers['on'];
-
-	class Machine {
-		emit: {
-			[key in keyof UnionToIntersection<EventHandlers>]: (...args: any) => any
-		};
-		constructor() {
-			this.emit = handlerMap;
-		}
-		createParentSender(fn: (event: string, value?: any) => void) {
-			sendParent = fn;
-		}
-		destroy() { }
-		get subscribe() {
-			return merged.subscribe;
-		}
+		this.#sendParent(event, value);
 	}
-
-	return new Machine();
+	get state() {
+		return get(this.#data).state;
+	}
+	get subscribe() {
+		return this.#data.subscribe;
+	}
 }
+

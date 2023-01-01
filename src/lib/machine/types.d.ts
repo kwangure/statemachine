@@ -20,7 +20,7 @@ export interface Transitions<C extends Config = Config, A extends string = strin
 	}
 };
 
-export type Config<C, A, Condition> = {
+export type Config<C, A = string | number | symbol, Condition = string | number | symbol> = {
 	states: Record<keyof C['states'], {
 		on?: {
 			[k: string]: Handler<C, A, Condition>[],

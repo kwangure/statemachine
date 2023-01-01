@@ -1,5 +1,5 @@
-import { createMachine } from '$lib/machine/create';
 import { get } from 'svelte/store';
+import { Machine } from '$lib/machine/create';
 import { todo } from "./todo";
 import { uid } from 'uid';
 
@@ -26,7 +26,7 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 export function todos() {
-	return createMachine({
+	return new Machine({
 		initial: 'loading',
 		config: {
 			states: {
