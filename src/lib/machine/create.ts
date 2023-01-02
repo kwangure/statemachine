@@ -149,7 +149,7 @@ export class Machine<
 			const listenerMap = nullo();
 			for (const prop in listeners) {
 				listenerMap[prop] = (...args: any) => {
-					this.executeHandlers([
+					this.#executeHandlers([
 						...(listeners[prop] ?? []),
 						...(this.#config.states[states[i]].always || []),
 					], ...args);
@@ -164,7 +164,7 @@ export class Machine<
 		};
 
 		this.emit = handlerMap;
-		this.executeHandlers(this.#config.states[this.state].entry || [])
+		this.#executeHandlers(this.#config.states[this.state].entry || [])
 	}
 	createParentSender(fn: (event: string, value?: any) => void) {
 		this.#sendParent = fn;
@@ -173,7 +173,7 @@ export class Machine<
 		return get(this.#data).data;
 	}
 	destroy() { }
-	executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
+	#executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
 		while (handlers.length) {
 			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
 			if (this.#conditions && handler.condition) {
