@@ -8,24 +8,26 @@ export interface Thing<T> {
 	store: Readable<T>;
 }
 
-export interface Handler<C extends Config, A, Condition> {
+export interface Handler<C, A, Condition> {
 	actions?: A[],
 	transitionTo?: keyof C['states'],
 	condition?: Condition,
 }
 
-export interface Transitions<C extends Config = Config, A extends string = string, Condition extends string = string> {
-	on?: {
-		[k: string]: Handler<C, A, Condition>[],
-	}
-};
-
-export type Config<C, A = string | number | symbol, Condition = string | number | symbol> = {
+export type Config<C, A, Condition> = {
 	states: Record<keyof C['states'], {
 		on?: {
-			[k: string]: Handler<C, A, Condition>[],
+			[k: string]: {
+				actions?: A[],
+				transitionTo?: keyof C['states'],
+				condition?: Condition,
+			}[],
 		}
-		always?: Handler<C, A, Condition>[],
+		always?: {
+			actions?: A[],
+			transitionTo?: keyof C['states'],
+			condition?: Condition,
+		}[],
 		entry?: {
 			actions?: A[],
 			condition?: Condition,
@@ -36,7 +38,11 @@ export type Config<C, A = string | number | symbol, Condition = string | number 
 		}[],
 	}>,
 	on?: {
-		[k: string]: Handler<C, A, Condition>[],
+		[k: string]: {
+			actions?: Actions[],
+			condition?: Condition,
+			transitionTo?: keyof C['states'],
+		}[],
 	},
 };
 

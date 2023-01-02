@@ -1,6 +1,6 @@
 import { derived, get, type Readable } from 'svelte/store';
-import type { Config, Handler, Transitions } from './types';
-import type { SetRequired, UnionToIntersection } from 'type-fest';
+import type { Config, Handler } from './types';
+import type { UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
 
 /**
@@ -41,10 +41,6 @@ function isDefined<T>(argument: T | undefined): argument is T {
 
 const nullo = () => Object.create(null);
 
-type MightHaveEventHandlers<C extends Config<C>> = C | C['states'][keyof C['states']];
-type HaveEventHandlers<C extends Config<C>> = Extract<MightHaveEventHandlers<C>, SetRequired<Transitions, 'on'>>;
-type EventHandlers<C extends Config<C>> = HaveEventHandlers<C>['on'];
-
 export class Machine<
 	ActionList extends Depth2Path<Ops, keyof Ops> | keyof Actions,
 	C extends Config<C, ActionList, keyof Conditions>,
@@ -54,7 +50,11 @@ export class Machine<
 	This extends {
 		data: { [key in keyof Data]: Data[key] };
 		emit: {
-			[key in keyof UnionToIntersection<EventHandlers<C>>]: (...args: any) => any
+			[
+				key in keyof UnionToIntersection<
+					Extract<C | C['states'][keyof C['states']], { on: any }>['on']
+				>
+			]: (...args: any) => any
 		},
 		sendParent: (event: string, value?: any) => void;
 		state: keyof C['states'],
@@ -83,9 +83,7 @@ export class Machine<
 	#sendParent: ((event: string, value?: any) => void) | null = null;
 	#thingOps: any;
 
-	emit: {
-		[key in keyof UnionToIntersection<EventHandlers<C>>]: (...args: any) => any
-	};
+	emit: This['emit'];
 
 	constructor(options: {
 		actions?: Actions,
