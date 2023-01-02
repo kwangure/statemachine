@@ -26,9 +26,7 @@
 		</label>
 		<ul class="todo-list">
 			{#each $todos.data.filteredTodos as todo}
-				<Todo todo={todo}
-					on:TODO.COMMIT={todos.emit['TODO.COMMIT']}
-					on:TODO.DELETE={() => todos.emit['TODO.DELETE'](todo)}/>
+				<Todo todo={todo}/>
 			{/each}
 		</ul>
 	</section>

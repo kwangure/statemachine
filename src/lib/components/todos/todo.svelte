@@ -4,10 +4,6 @@
 	/** @type {ReturnType<import('$lib/models/todos').todo>} */
 	export let todo;
 
-	const dispatch = createEventDispatcher();
-	todo.createParentSender((event, value) => {
-		dispatch(event, value);
-	});
 
 	/** @type {import('svelte/action').Action<HTMLInputElement>} */
 	function focus(node, state) {

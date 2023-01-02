@@ -5,9 +5,7 @@ import { thing } from '$lib/thing/thing';
 
 /**
 	TODO:
-	- Replace `sendParent` w/ automatic bubbling
-		- First add `children` & `parent` properties to machines, simplify `sendParent`
-		- Then replace `sendParent` using these properties altogether
+	- Automatically bubble events to parents
 	- Explore asynchronous actions/events
  */
 
@@ -61,7 +59,6 @@ export class Machine<
 		},
 		removeChild<T>(child: T extends Machine<any, any, any, any, any, any, any> ? T : never): T;
 		remove: () => void;
-		sendParent: (event: string, value?: any) => void;
 		state: keyof C['states'],
 	},
 	Actions extends {
@@ -84,7 +81,6 @@ export class Machine<
 		data: Data ;
 		state: keyof C["states"];
 	}>>
-	#sendParent: ((event: string, value?: any) => void) | null = null;
 	#thingOps: any;
 
 	emit: This['emit'];
@@ -171,9 +167,6 @@ export class Machine<
 		return this.#children
 			.update(($children) => [...$children, ...children]);
 	}
-	createParentSender(fn: (event: string, value?: any) => void) {
-		this.#sendParent = fn;
-	}
 	get children(): ReadonlyArray<Machine<any, any, any, any, any, any, any>> {
 		return get(this.#data).children;
 	}
@@ -229,18 +222,6 @@ export class Machine<
 				if (found) child.__parent = null;
 				return !found;
 			}));
-	}
-	sendParent(event: string, value: any) {
-		if (!this.#sendParent) {
-			throw Error([
-				'Attempted to call \'sendParent\' before assigning a parent sender.',
-				'Usage:',
-				'    store.createParentSender((event, value) => {',
-				'        dispatch(event, value);',
-				'    });',
-			].join('\n'));
-		}
-		this.#sendParent(event, value);
 	}
 	get state() {
 		return get(this.#data).state;

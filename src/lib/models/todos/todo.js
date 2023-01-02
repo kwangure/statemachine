@@ -11,10 +11,12 @@ export function todo(data) {
     return new Machine({
         actions: {
             commit() {
-                this.sendParent('TODO.COMMIT');
+                /** @type {ReturnType<import('./todos.js').todos>} */(this.parent)
+                    .emit['TODO.COMMIT']();
             },
             delete() {
-                this.sendParent('TODO.DELETE', this.data.id);
+                /** @type {ReturnType<import('./todos.js').todos>} */(this.parent)
+                    .emit['TODO.DELETE'](this);
             },
         },
         conditions: {
