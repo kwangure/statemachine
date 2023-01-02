@@ -1,4 +1,4 @@
-import { derived, get, type Readable } from 'svelte/store';
+import { derived, get, writable, type Readable } from 'svelte/store';
 import type { Config, Handler } from './types';
 import type { UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
@@ -48,6 +48,9 @@ export class Machine<
 	// Unfortunately we have to manually type `this` for non-static member
 	// of the class. I don't think there's a way to pass it automatically?
 	This extends {
+		append: (...children: Machine<any, any, any, any, any, any, any>[]) => void;
+		children: ReadonlyArray<Machine<any, any, any, any, any, any, any>>;
+		parent: Readonly<Machine<any, any, any, any, any, any, any>>;
 		data: { [key in keyof Data]: Data[key] };
 		emit: {
 			[
@@ -56,6 +59,8 @@ export class Machine<
 				>
 			]: (...args: any) => any
 		},
+		removeChild<T>(child: T extends Machine<any, any, any, any, any, any, any> ? T : never): T;
+		remove: () => void;
 		sendParent: (event: string, value?: any) => void;
 		state: keyof C['states'],
 	},
@@ -71,9 +76,11 @@ export class Machine<
 		}
 	}> {
 	#actions: Actions | undefined;
+	#children = writable([] as Machine<any, any, any, any, any, any, any>[]);
 	#conditions: Conditions | undefined;
 	#config: C;
 	#data: ReturnType<typeof derived<Readable<any>[], {
+		children: Machine<any, any, any, any, any, any, any>[];
 		data: Data ;
 		state: keyof C["states"];
 	}>>
@@ -81,6 +88,7 @@ export class Machine<
 	#thingOps: any;
 
 	emit: This['emit'];
+	__parent: Machine<any, any, any, any, any, any, any> | null = null;
 
 	constructor(options: {
 		actions?: Actions,
@@ -101,19 +109,24 @@ export class Machine<
 
 		this.#thingOps = Object.create({ [STATE]: state.ops });
 		const thingNames: string[] = [];
-		const thingStores: Readable<any>[] = [state.store];
+		const thingStores: Readable<any>[] = [state.store, this.#children];
 
 		this.#data = derived(thingStores,
 			(thingStoreValues) => {
 				let $state: keyof C['states'];
+				let $children: Machine<any, any, any, any, any, any, any>[];
 				let $things: any[];
-				[$state, ...$things] = thingStoreValues;
+				[$state, $children, ...$things] = thingStoreValues;
 				const entries = $things.map(($thing, i) => {
 					return [thingNames[i], $thing];
 				});
 				const data: Data = Object.fromEntries(entries);
 
-				return { data, state: $state };
+				return {
+					children: $children,
+					data,
+					state: $state
+				};
 			});
 		const ops = options.ops || nullo();
 		for (const [key, value] of Object.entries(options.data || nullo())) {
@@ -151,8 +164,18 @@ export class Machine<
 		this.emit = handlerMap;
 		this.#executeHandlers(this.#config.states[this.state].entry || [])
 	}
+	append(...children: Machine<any, any, any, any, any, any, any>[]) {
+		for (const child of children) {
+			child.__parent = this;
+		}
+		return this.#children
+			.update(($children) => [...$children, ...children]);
+	}
 	createParentSender(fn: (event: string, value?: any) => void) {
 		this.#sendParent = fn;
+	}
+	get children(): ReadonlyArray<Machine<any, any, any, any, any, any, any>> {
+		return get(this.#data).children;
 	}
 	get data() {
 		return get(this.#data).data;
@@ -192,6 +215,20 @@ export class Machine<
 				}
 			}
 		}
+	}
+	get parent(): Readonly<Machine<any, any, any, any, any, any, any>> | null {
+		return this.__parent;
+	}
+	remove() {
+		this.__parent?.removeChild(this);
+	}
+	removeChild(child: Machine<any, any, any, any, any, any, any>) {
+		this.#children
+			.update(($children) => $children.filter(($child) => {
+				const found = $child === child;
+				if (found) child.__parent = null;
+				return !found;
+			}));
 	}
 	sendParent(event: string, value: any) {
 		if (!this.#sendParent) {

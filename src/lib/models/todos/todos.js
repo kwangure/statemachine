@@ -34,7 +34,8 @@ export function todos() {
 					entry: [{
 						transitionTo: 'ready',
 						actions: [
-							'$todos.load',
+							'load',
+							'$todos.fromChildren',
 							'$activeTodos.update',
 							'$completedTodos.update',
 							'$filteredTodos.update',
@@ -48,7 +49,8 @@ export function todos() {
 			on: {
 				'CLEAR_COMPLETED': [{
 					actions: [
-						'$todos.clearCompleted',
+						'clearCompleted',
+						'$todos.fromChildren',
 						'$activeTodos.update',
 						'$completedTodos.update',
 						'$filteredTodos.update',
@@ -82,7 +84,8 @@ export function todos() {
 				'NEWTODO.COMMIT': [{
 					actions: [
 						'$newTodo.empty',
-						'$todos.addNew',
+						'addNew',
+						'$todos.fromChildren',
 						'$activeTodos.update',
 						'$completedTodos.update',
 						'$filteredTodos.update',
@@ -110,7 +113,8 @@ export function todos() {
 				}],
 				'TODO.DELETE': [{
 					actions: [
-						'$todos.delete',
+						'delete',
+						'$todos.fromChildren',
 						'$activeTodos.update',
 						'$completedTodos.update',
 						'$filteredTodos.update',
@@ -142,39 +146,18 @@ export function todos() {
 						return todo;
 					});
 				},
-				clearCompleted() {
-					return this.data.todos.filter((todo) => {
-						const $todo = get(todo);
-						if ($todo.data.completed) todo.destroy();
-						return !$todo.data.completed;
-					});
-				},
 				completeAll() {
 					return this.data.todos.map((todo) => {
 						todo.emit.SET_COMPLETED();
 						return todo;
 					});
 				},
-				addNew(title) {
-					const newTodo = todo(createNewTodo(title.trim()));
-					return [...this.data.todos, newTodo];
-				},
-				delete(deleted) {
-					return this.data.todos.filter((todo) => {
-						return todo !== deleted;
-					});
-				},
 				forceRerender() {
 					return [...this.data.todos];
 				},
-				load() {
-					// TODO: Add loading state to parse JSON
-					const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
-						JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
-					).map((todoJson) => todo(todoJson));
-
-					return todosJson;
-				}
+				fromChildren() {
+					return [...this.children];
+				},
 			},
 			filter: {
 				update: (newFilter) => newFilter,
@@ -218,6 +201,29 @@ export function todos() {
 			},
 		},
 		actions: {
+			addNew(title) {
+				const newTodo = todo(createNewTodo(title.trim()));
+				this.append(newTodo);
+			},
+			delete(child) {
+				child.remove();
+			},
+			clearCompleted() {
+				return this.data.todos.forEach((todo) => {
+					if (todo.data.completed) {
+						todo.remove();
+					}
+				});
+			},
+			load() {
+				const todosJson = /** @type {ReturnType<createNewTodo>[]} */ (
+					JSON.parse(getLocalStorageItem(TODOS_STORE, '[]'))
+				);
+				const todoMachines = todosJson
+					.map((todoJson) => todo(todoJson));
+
+				this.append(...todoMachines);
+			},
 			persist() {
 				try {
 					const todosJson = JSON.stringify(this.data.todos.map((todo) => get(todo).data));
