@@ -62,9 +62,6 @@ export class Machine<
 	Actions extends {
 		[x: string]: (this: This, ...args: any) => any;
 	},
-	Computed extends {
-		[x: string]: (this: This, ...args: any) => any;
-	},
 	Conditions extends {
 		[x: string]: (this: This, ...args: any) => boolean;
 	},
@@ -77,7 +74,7 @@ export class Machine<
 	#conditions: Conditions | undefined;
 	#config: C;
 	#data: ReturnType<typeof derived<Readable<any>[], {
-		data: Data & { [key in keyof Computed]: ReturnType<Computed[key]>; };
+		data: Data ;
 		state: keyof C["states"];
 	}>>
 	#sendParent: ((event: string, value?: any) => void) | null = null;
@@ -89,7 +86,6 @@ export class Machine<
 		actions?: Actions,
 		data?: Data,
 		conditions?: Conditions,
-		computed?: Computed,
 		config: C,
 		initial?: keyof C['states'],
 		ops?: Ops,
@@ -115,18 +111,7 @@ export class Machine<
 				const entries = $things.map(($thing, i) => {
 					return [thingNames[i], $thing];
 				});
-				const data: Data & {
-					[key in keyof Computed]: ReturnType<Computed[key]>;
-				} = Object.fromEntries(entries);
-
-				if (options.computed) {
-					const computedEntries = Object
-						.entries(options.computed)
-						.map(([funcName, func]) => {
-							return [funcName, { get: () => func.call(this as unknown as This) }]
-						});
-					Object.defineProperties(data, Object.fromEntries(computedEntries));
-				}
+				const data: Data = Object.fromEntries(entries);
 
 				return { data, state: $state };
 			});

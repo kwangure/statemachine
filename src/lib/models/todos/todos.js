@@ -33,36 +33,90 @@ export function todos() {
 				loading: {
 					entry: [{
 						transitionTo: 'ready',
-						actions: ['$todos.load'],
+						actions: [
+							'$todos.load',
+							'$activeTodos.update',
+							'$completedTodos.update',
+							'$filteredTodos.update',
+							'$allCompleted.update',
+							'$markAllAs.update',
+						],
 					}],
 				},
 				ready: {},
 			},
 			on: {
 				'CLEAR_COMPLETED': [{
-					actions: ['$todos.clearCompleted'],
+					actions: [
+						'$todos.clearCompleted',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+					],
 				}],
 				'MARK.ACTIVE': [{
-					actions: ['$todos.activateAll'],
+					actions: [
+						'$todos.activateAll',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+					],
 				}],
 				'MARK.COMPLETED': [{
-					actions: ['$todos.completeAll'],
+					actions: [
+						'$todos.completeAll',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+					],
 				}],
 				'NEWTODO.CHANGE': [{
 					actions: ['$newTodo.update']
 				}],
 				'NEWTODO.COMMIT': [{
-					actions: ['$newTodo.empty', '$todos.addNew', 'persist'],
+					actions: [
+						'$newTodo.empty',
+						'$todos.addNew',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+						'persist',
+					],
 					condition: 'notEmpty',
 				}],
 				'SHOW': [{
-					actions: ['$filter.update'],
+					actions: [
+						'$filter.update',
+						'$filteredTodos.update',
+					],
 				}],
 				'TODO.COMMIT': [{
-					actions: ['$todos.forceRerender', 'persist'],
+					actions: [
+						'$todos.forceRerender',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+						'persist'],
 				}],
 				'TODO.DELETE': [{
-					actions: ['$todos.delete', 'persist'],
+					actions: [
+						'$todos.delete',
+						'$activeTodos.update',
+						'$completedTodos.update',
+						'$filteredTodos.update',
+						'$allCompleted.update',
+						'$markAllAs.update',
+						'persist'],
 				}],
 			}
 		},
@@ -70,6 +124,11 @@ export function todos() {
 			newTodo: '',
 			todos: /** @type {ReturnType<todo>[]} */([]),
 			filter: /** @type {'all' | 'active' | 'completed'} */('all'),
+			activeTodos: /** @type {ReturnType<todo>[]} */([]),
+			completedTodos: /** @type {ReturnType<todo>[]} */([]),
+			filteredTodos: /** @type {ReturnType<todo>[]} */([]),
+			markAllAs: /** @type {'active' | 'completed'} */('active'),
+			allCompleted: false,
 		},
 		ops: {
 			newTodo: {
@@ -120,37 +179,43 @@ export function todos() {
 			filter: {
 				update: (newFilter) => newFilter,
 			},
-		},
-		computed: {
-			activeTodos() {
-				return this.data.todos
-					.filter((todo) => !get(todo).data.completed);
+			activeTodos: {
+				update() {
+					return this.data.todos
+						.filter((todo) => !get(todo).data.completed);
+				},
 			},
-			allCompleted() {
-				return this.data.todos.length > 0 && this.data.todos
-					.filter((todo) => !get(todo).data.completed).length === 0;
-			},
-			completedTodos() {
-				return this.data.todos
-					.filter((todo) => get(todo).data.completed);
-			},
-			filteredTodos() {
-				switch (this.data.filter) {
-					case 'active':
-						return this.data.todos
-							.filter((todo) => !get(todo).data.completed);
-					case 'completed':
-						return this.data.todos
-							.filter((todo) => get(todo).data.completed);
-					default:
-						return this.data.todos;
+			completedTodos: {
+				update() {
+					return this.data.todos
+						.filter((todo) => get(todo).data.completed);
 				}
 			},
-			markAllAs() {
-				const allCompleted = this.data.todos.length > 0 && this.data.todos
-					.filter((todo) => !get(todo).data.completed).length === 0;
-				return allCompleted ? "active" : "completed";
-			}
+			filteredTodos: {
+				update() {
+					switch (this.data.filter) {
+						case 'active':
+							return this.data.activeTodos;
+						case 'completed':
+							return this.data.completedTodos;
+						default:
+							return this.data.todos;
+					}
+				}
+			},
+			allCompleted: {
+				update() {
+					return this.data.todos.length > 0
+						&& this.data.activeTodos.length === 0;
+				},
+			},
+			markAllAs: {
+				update() {
+					const allCompleted = this.data.todos.length > 0 && this.data.todos
+						.filter((todo) => !get(todo).data.completed).length === 0;
+					return allCompleted ? "active" : "completed";
+				}
+			},
 		},
 		actions: {
 			persist() {
