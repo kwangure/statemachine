@@ -56,6 +56,7 @@ export function todos() {
 						'$filteredTodos.update',
 						'$allCompleted.update',
 						'$markAllAs.update',
+						'persist',
 					],
 				}],
 				'MARK.ACTIVE': [{
@@ -66,6 +67,7 @@ export function todos() {
 						'$filteredTodos.update',
 						'$allCompleted.update',
 						'$markAllAs.update',
+						'persist',
 					],
 				}],
 				'MARK.COMPLETED': [{
@@ -76,6 +78,7 @@ export function todos() {
 						'$filteredTodos.update',
 						'$allCompleted.update',
 						'$markAllAs.update',
+						'persist',
 					],
 				}],
 				'NEWTODO.CHANGE': [{
@@ -120,7 +123,8 @@ export function todos() {
 						'$filteredTodos.update',
 						'$allCompleted.update',
 						'$markAllAs.update',
-						'persist'],
+						'persist',
+					],
 				}],
 			}
 		},
