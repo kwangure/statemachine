@@ -32,6 +32,8 @@ type Depth2Path<T, U extends keyof T> = U extends string | number
 	: never;
 
 const STATE = '__$$state';
+const TRANSITION_FROM = '__$$transition_from';
+const TRANSITION_TO = '__$$transition_to';
 
 function isDefined<T>(argument: T | undefined): argument is T {
 	return argument !== undefined
@@ -60,6 +62,10 @@ export class Machine<
 		removeChild<T>(child: T extends Machine<any, any, any, any, any, any, any> ? T : never): T;
 		remove: () => void;
 		state: keyof C['states'],
+		transition: {
+			to: keyof C["states"] | null;
+			from: keyof C["states"] | null;
+		};
 	},
 	Actions extends {
 		[x: string]: (this: This, ...args: any) => any;
@@ -71,7 +77,8 @@ export class Machine<
 		[k in keyof Data]: {
 			[x: string]: (this: This, ...args: any) => Data[k]
 		}
-	}> {
+	},
+> {
 	#actions: Actions | undefined;
 	#children = writable([] as Machine<any, any, any, any, any, any, any>[]);
 	#conditions: Conditions | undefined;
@@ -80,6 +87,10 @@ export class Machine<
 		children: Machine<any, any, any, any, any, any, any>[];
 		data: Data ;
 		state: keyof C["states"];
+		transition: {
+			to: keyof C["states"] | null;
+			from: keyof C["states"] | null;
+		};
 	}>>
 	#thingOps: any;
 
@@ -99,20 +110,33 @@ export class Machine<
 		this.#config = options.config;
 
 		const states = (Object.keys(this.#config.states) as (keyof C['states'])[])
-		const setters = Object
-			.fromEntries(states.map((state) => [state, () => state]))
-		const state = thing(options.initial || states[0], setters);
+		const stateSetters = states.map((state) => [state, () => state]);
+		const state = thing(options.initial || states[0], Object.fromEntries(stateSetters));
+		const transitionSetters = [...stateSetters, ['null', () => null]];
+		const transitionTo = thing(null, Object.fromEntries(transitionSetters));
+		const transitionFrom = thing(null, Object.fromEntries(transitionSetters));
 
-		this.#thingOps = Object.create({ [STATE]: state.ops });
+		this.#thingOps = Object.create({
+			[STATE]: state.ops,
+			[TRANSITION_TO]: transitionTo.ops,
+			[TRANSITION_FROM]: transitionFrom.ops,
+		});
 		const thingNames: string[] = [];
-		const thingStores: Readable<any>[] = [state.store, this.#children];
+		const thingStores: Readable<any>[] = [
+			state.store,
+			transitionTo.store,
+			transitionFrom.store,
+			this.#children,
+		];
 
 		this.#data = derived(thingStores,
 			(thingStoreValues) => {
 				let $state: keyof C['states'];
+				let $transitionTo: keyof C['states'] | null;
+				let $transitionFrom: keyof C['states'] | null;
 				let $children: Machine<any, any, any, any, any, any, any>[];
 				let $things: any[];
-				[$state, $children, ...$things] = thingStoreValues;
+				[$state, $transitionTo, $transitionFrom, $children, ...$things] = thingStoreValues;
 				const entries = $things.map(($thing, i) => {
 					return [thingNames[i], $thing];
 				});
@@ -121,7 +145,11 @@ export class Machine<
 				return {
 					children: $children,
 					data,
-					state: $state
+					state: $state,
+					transition: {
+						to: $transitionTo,
+						from: $transitionFrom,
+					},
 				};
 			});
 		const ops = options.ops || nullo();
@@ -187,11 +215,15 @@ export class Machine<
 
 			if (transitionTo) {
 				handlers = [
+					{ actions: [`$${TRANSITION_TO}.${String(transitionTo)}` as ActionList] },
+					{ actions: [`$${TRANSITION_FROM}.${String(this.state)}` as ActionList] },
 					...this.#config.states[this.state].exit || [],
 					{ actions: transitionActions },
 					{ actions: [`$${STATE}.${String(transitionTo)}` as ActionList] },
 					...this.#config.states[transitionTo].entry || [],
 					...this.#config.states[transitionTo].always || [],
+					{ actions: [`$${TRANSITION_TO}.null` as ActionList] },
+					{ actions: [`$${TRANSITION_FROM}.null` as ActionList] },
 				].filter(isDefined);
 				continue;
 			}
@@ -228,6 +260,9 @@ export class Machine<
 	}
 	get subscribe() {
 		return this.#data.subscribe;
+	}
+	get transition() {
+		return get(this.#data).transition;
 	}
 }
 
