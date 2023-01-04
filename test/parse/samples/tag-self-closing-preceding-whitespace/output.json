@@ -1,0 +1,31 @@
+{
+	"start": 0,
+	"end": 15,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 8,
+			"type": "Element",
+			"name": "",
+			"children": [
+				{
+					"error": {
+						"code": "invalid_tag_name",
+						"message": "Expected an alphabet character but instead found ' '"
+					},
+					"start": 1,
+					"end": 8,
+					"type": "Invalid"
+				}
+			]
+		},
+		{
+			"start": 8,
+			"end": 15,
+			"type": "Element",
+			"name": "data",
+			"children": []
+		}
+	]
+}
