@@ -4,8 +4,9 @@
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
 
-	const code = '< data/><data/>';
+	const code = '<data id />';
 	const parserMachine = stateParser(code);
+	let showing = 'statemachine';
 
 	$: ({ state, data } = $parserMachine)
 	$: ({ index, source, stack } = data);
@@ -42,6 +43,10 @@
 			`<span class='unseen'>${escape(unseen)}</span>`,
 		].join('');
 	}
+
+	function toggleShowing() {
+		showing = showing === 'statemachine' ? 'svelte' : 'statemachine';
+	}
 </script>
 <pre>
 {state} {index};
@@ -55,10 +60,14 @@
 		{/if}
 	</div>
 	<div class="code">
-		<h3>State Machine</h3>
-		<Code highlight={json} code={JSON.stringify(stack, null, 4)}/>
-		<h3>Svelte</h3>
-		<Code highlight={json} code={JSON.stringify(parse(code), null, 4)}/>
+		<button on:click={toggleShowing}>Toggle Parser</button>
+		{#if showing === 'statemachine'}
+			<h3>State Machine</h3>
+			<Code highlight={json} code={JSON.stringify(stack, null, 4)}/>
+		{:else if showing === 'svelte'}
+			<h3>Svelte</h3>
+			<Code highlight={json} code={JSON.stringify(parse(code), null, 4)}/>
+		{/if}
 	</div>
 </div>
 

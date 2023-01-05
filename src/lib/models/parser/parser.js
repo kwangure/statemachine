@@ -1,7 +1,8 @@
-import { element, fragment, invalid } from "./nodes/nodes";
+import { attribute, element, fragment, invalid } from "./nodes/nodes";
 import { Machine } from "$lib/machine/create";
 
 /**
+ * @typedef {import('./nodes/types').Attribute} Attribute
  * @typedef {import('./nodes/types').Element} Element
  * @typedef {import('./nodes/types').Fragment} Fragment
  * @typedef {import('./nodes/types').Invalid} Invalid
@@ -70,13 +71,39 @@ export function parser(source) {
 							message: `Expected an alphabet character but instead found '${value}'`,
 						};
 					} else {
-						console.warn({ transition: this.transition });
+						console.error('Unknown error code', {
+							transition: this.transition,
+						});
 					}
 					const child = /** @type {Invalid} */(invalid({
 						start: this.data.index,
 						error,
 					}));
 					this.data.stack.push(child);
+					return this.data.stack;
+				},
+				popAttribute() {
+					const current = this.data.stack.pop();
+					if (!current) {
+						console.error('Popped from an empty stack.');
+					} else if (current.type !== 'Attribute') {
+						console.error('Popped element is not an attribute');
+					} else {
+						current.end = this.data.index;
+						if (Array.isArray(current.value) && !current.value.length) {
+							current.value = true;
+						}
+						const last = this.data.stack.at(-1);
+						if (!last) {
+							console.error('The last element should not be popped');
+						} else {
+							if (!last.attributes) {
+								console.error('Last has no attributes')
+							} else {
+								last.attributes?.push(current);
+							}
+						}
+					}
 					return this.data.stack;
 				},
 				popElement() {
@@ -95,6 +122,14 @@ export function parser(source) {
 					}
 					return this.data.stack;
 				},
+				pushAttribute() {
+					const child = /** @type {Attribute} */(attribute({
+						start: this.data.index,
+						name: '',
+					}));
+					this.data.stack.push(child);
+					return this.data.stack;
+				},
 			},
 		},
 		config: {
@@ -111,6 +146,35 @@ export function parser(source) {
 							]
 						}],
 					}
+				},
+				attribute: {
+					always: [{ transitionTo: "done", condition: "isDone" }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'tag',
+								condition: 'isClosingTag',
+								actions: [
+									"$stack.popAttribute",
+									"$index.increment"
+								],
+							},
+							{
+								transitionTo: 'whitespace',
+								condition: 'isWhitespace',
+								actions: [
+									"$stack.popAttribute",
+									"$index.increment",
+								],
+							},
+							{
+								actions: [
+									"$stack.addName",
+									"$index.increment",
+								],
+							},
+						]
+					},
 				},
 				tag: {
 					always: [{ transitionTo: "done", condition: "isDone" }],
@@ -179,6 +243,15 @@ export function parser(source) {
 								actions: ["$index.increment"],
 							},
 							{
+								transitionTo: 'attribute',
+								condition: 'isAttribute',
+								actions: [
+									"$stack.pushAttribute",
+									"$stack.addName",
+									"$index.increment",
+								],
+							},
+							{
 								transitionTo: 'invalid',
 								condition: 'isInvalidWhitespace',
 								actions: [
@@ -226,6 +299,11 @@ export function parser(source) {
 		conditions: {
 			isAlphaCharacter(value) {
 				return /[A-z]/.test(value);
+			},
+			isAttribute(value) {
+				return /[A-z]/.test(value)
+					&& this.state === 'whitespace'
+					&& this.transition.from === 'tagname';
 			},
 			isClosingTag(value) {
 				return value === '/';

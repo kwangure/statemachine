@@ -19,6 +19,13 @@ export interface Text extends BaseNode {
 export interface Element extends BaseNode {
 	type: 'Element';
 	name: string;
+	attributes: Array<Attribute>;
+}
+
+export interface Attribute extends BaseNode {
+	type: 'Attribute';
+	name: string;
+	value: any[] | true;
 }
 
 export interface Invalid extends BaseNode {
@@ -29,4 +36,4 @@ export interface Invalid extends BaseNode {
 	};
 }
 
-export type TemplateNode = Element | Fragment | Invalid | Text;
+export type TemplateNode = Attribute | Element | Fragment | Invalid | Text;

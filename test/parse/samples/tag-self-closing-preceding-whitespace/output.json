@@ -8,6 +8,7 @@
 			"end": 8,
 			"type": "Element",
 			"name": "",
+			"attributes": [],
 			"children": [
 				{
 					"error": {
@@ -25,6 +26,7 @@
 			"end": 15,
 			"type": "Element",
 			"name": "data",
+			"attributes": [],
 			"children": []
 		}
 	]

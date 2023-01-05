@@ -8,6 +8,7 @@
 			"end": 13,
 			"type": "Element",
 			"name": "div",
+			"attributes": [],
 			"children": [
 				{
 					"error": {
