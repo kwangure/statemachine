@@ -9,17 +9,16 @@
 			"type": "Element",
 			"name": "div",
 			"attributes": [],
-			"children": [
-				{
-					"error": {
-						"code": "invalid_attribute_name",
-						"message": "Expected a valid attribute character but instead found '+'"
-					},
-					"start": 6,
-					"end": 13,
-					"type": "Invalid"
-				}
-			]
+			"children": [],
+			"error": {
+				"error": {
+					"code": "invalid_attribute_name",
+					"message": "Expected a valid attribute character but instead found '+'"
+				},
+				"start": 6,
+				"end": 13,
+				"type": "Invalid"
+			}
 		}
 	]
 }

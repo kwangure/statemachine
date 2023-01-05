@@ -105,6 +105,25 @@ export function parser(source) {
 					}
 					return this.data.stack;
 				},
+				popInvalid() {
+					const invalid = /** @type {Invalid} */(this.data.stack.pop());
+					const nodeWithError = this.data.stack.pop();
+					if (!invalid || !nodeWithError) {
+						console.error('Popped from an empty stack.');
+					} else {
+						invalid.end = this.data.index;
+						nodeWithError.end = this.data.index;
+						nodeWithError.error = invalid;
+						const parent = this.data.stack.at(-1);
+						if (!parent) {
+							console.error('Errored element has no parent');
+						} else {
+							if (!parent.children) console.warn('Last has no children');
+							parent.children?.push(nodeWithError);
+						}
+					}
+					return this.data.stack;
+				},
 				pushAttribute() {
 					const child = /** @type {Attribute} */(attribute({
 						start: this.data.index,
@@ -266,10 +285,7 @@ export function parser(source) {
 					},
 					exit: [{
 						actions: [
-							// Pop invalid element
-							'$stack.popElement',
-							// Pop the element it was parsing before it errored
-							'$stack.popElement'
+							'$stack.popInvalid',
 						],
 					}]
 				},

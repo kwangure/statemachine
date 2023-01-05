@@ -9,17 +9,16 @@
 			"type": "Element",
 			"name": "div",
 			"attributes": [],
-			"children": [
-				{
-					"error": {
-						"code": "invalid_tag_name",
-						"message": "Expected a valid tag character but instead found '+'"
-					},
-					"start": 4,
-					"end": 12,
-					"type": "Invalid"
-				}
-			]
+			"children": [],
+			"error": {
+				"error": {
+					"code": "invalid_tag_name",
+					"message": "Expected a valid tag character but instead found '+'"
+				},
+				"start": 4,
+				"end": 12,
+				"type": "Invalid"
+			}
 		}
 	]
 }
