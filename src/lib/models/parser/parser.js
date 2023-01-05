@@ -181,7 +181,10 @@ export function parser(source) {
 							{
 								transitionTo: 'invalid',
 								condition: 'isInvalidWhitespace',
-								actions: ["$index.increment"],
+								actions: [
+									"$stack.addInvalid",
+									"$index.increment",
+								],
 							},
 							{
 								actions: ["$index.increment"],
