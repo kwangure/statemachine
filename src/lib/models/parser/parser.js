@@ -70,6 +70,11 @@ export function parser(source) {
 							code: 'invalid_tag_name',
 							message: `Expected an alphabet character but instead found '${value}'`,
 						};
+					} else if (this.transition.from === 'tagname') {
+						error = {
+							code: 'invalid_tag_character',
+							message: `'${value}' is not allowed within tags`,
+						};
 					} else {
 						console.error('Unknown error code', {
 							transition: this.transition,
@@ -225,7 +230,10 @@ export function parser(source) {
 							{
 								transitionTo: 'invalid',
 								condition: 'isNonAlphaCharacter',
-								actions: ["$index.increment"],
+								actions: [
+									"$stack.addInvalid",
+									"$index.increment",
+								],
 							},
 							{
 								actions: ["$stack.addName", "$index.increment"],

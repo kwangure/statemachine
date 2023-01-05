@@ -1,0 +1,25 @@
+{
+	"start": 0,
+	"end": 12,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 12,
+			"type": "Element",
+			"name": "div",
+			"attributes": [],
+			"children": [
+				{
+					"error": {
+						"code": "invalid_tag_character",
+						"message": "'+' is not allowed within tags"
+					},
+					"start": 4,
+					"end": 12,
+					"type": "Invalid"
+				}
+			]
+		}
+	]
+}
