@@ -31,6 +31,12 @@ export function parser(source) {
 						message: `Expected a valid tag character but instead found '${value}'`,
 					};
 				},
+				invalid_attribute_name(value) {
+					return {
+						code: 'invalid_attribute_name',
+						message: `Expected a valid attribute character but instead found '${value}'`,
+					};
+				},
 				empty: () => null,
 			},
 			html: {},
@@ -254,9 +260,17 @@ export function parser(source) {
 							},
 							{
 								transitionTo: 'invalid',
+								condition: 'isInvalidAttribute',
+								actions: [
+									"$error.invalid_attribute_name",
+									"$stack.addInvalid",
+									"$index.increment",
+								],
+							},
+							{
+								transitionTo: 'invalid',
 								condition: 'isInvalidWhitespace',
 								actions: [
-									"$error.invalid_tag_name",
 									"$stack.addInvalid",
 									"$index.increment",
 								],
@@ -312,6 +326,10 @@ export function parser(source) {
 			},
 			isDone(value) {
 				return this.data.index === this.data.source.length;
+			},
+			isInvalidAttribute(value) {
+				return this.data.stack.at(-1).type === 'Element'
+					&& !/[A-z\s]/.test(value);
 			},
 			isInvalidWhitespace(value) {
 				return !/\s/.test(value);

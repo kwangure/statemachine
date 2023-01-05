@@ -4,7 +4,7 @@
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
 
-	const code = '<data id />';
+	const code = '<div  +abc/>';
 	const parserMachine = stateParser(code);
 	let showing = 'statemachine';
 
