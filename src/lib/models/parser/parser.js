@@ -1,5 +1,5 @@
-import { attribute, element, fragment, invalid } from "./nodes/nodes";
-import { Machine } from "$lib/machine/create";
+import { attribute, element, fragment, invalid } from './nodes/nodes';
+import { Machine } from '$lib/machine/create';
 
 /**
  * @typedef {import('./nodes/types').Attribute} Attribute
@@ -25,36 +25,27 @@ export function parser(source) {
 		},
 		ops: {
 			error: {
-				invalid_tag_name(value) {
+				invalidTagName(value) {
 					return {
 						code: 'invalid_tag_name',
 						message: `Expected a valid tag character but instead found '${value}'`,
 					};
 				},
-				invalid_attribute_name(value) {
+				invalidAttributeName(value) {
 					return {
 						code: 'invalid_attribute_name',
 						message: `Expected a valid attribute character but instead found '${value}'`,
 					};
 				},
-				empty: () => null,
 			},
-			html: {},
 			index: {
 				increment() {
 					return this.data.index + 1;
-				}
+				},
 			},
+			html: {},
 			source: {},
 			stack: {
-				addElement() {
-					const child = /** @type {Element} */(element({
-						start: this.data.index,
-						name: '',
-					}));
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
 				addName(value) {
 					const current = this.data.stack.at(-1);
 					if (!current) {
@@ -66,22 +57,13 @@ export function parser(source) {
 					}
 					return this.data.stack;
 				},
-				addInvalid(value) {
-					let error = this.data.error;
-					if (!error) {
-						console.error('Unknown error code', {
-							transition: this.transition,
-						});
-						error = {
-							code: 'unknown-error',
-							message: `Unexpected character '${value}'`,
-						};
+				addEnd() {
+					const current = this.data.stack.at(-1);
+					if (!current) {
+						console.error('There\'s no item on the stack.');
+					} else {
+						current.end = this.data.index;
 					}
-					const child = /** @type {Invalid} */(invalid({
-						start: this.data.index,
-						error,
-					}));
-					this.data.stack.push(child);
 					return this.data.stack;
 				},
 				popAttribute() {
@@ -91,7 +73,6 @@ export function parser(source) {
 					} else if (current.type !== 'Attribute') {
 						console.error('Popped element is not an attribute');
 					} else {
-						current.end = this.data.index;
 						if (Array.isArray(current.value) && !current.value.length) {
 							current.value = true;
 						}
@@ -132,170 +113,153 @@ export function parser(source) {
 					this.data.stack.push(child);
 					return this.data.stack;
 				},
+				pushInvalid(value) {
+					let error = this.data.error;
+					if (!error) {
+						console.error('Unknown error code', {
+							transition: this.transition,
+						});
+						error = {
+							code: 'unknown-error',
+							message: `Unexpected character '${value}'`,
+						};
+					}
+					const child = /** @type {Invalid} */(invalid({
+						start: this.data.index,
+						error,
+					}));
+					this.data.stack.push(child);
+					return this.data.stack;
+				},
+				pushTag() {
+					const child = /** @type {Element} */(element({
+						start: this.data.index,
+						name: '',
+					}));
+					this.data.stack.push(child);
+					return this.data.stack;
+				},
 			},
 		},
 		config: {
 			states: {
 				fragment: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
-					on: {
-						CHARACTER: [{
-							transitionTo: 'tag',
-							condition: 'isTagStart',
-							actions: [
-								"$stack.addElement",
-								"$index.increment"
-							]
-						}],
-					}
-				},
-				attribute: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
-								transitionTo: 'tag',
-								condition: 'isClosingTag',
+								transitionTo: 'tagOpen',
+								condition: 'isTagOpen',
 								actions: [
-									"$stack.popAttribute",
-									"$index.increment"
+									'$stack.pushTag',
+									'$index.increment',
 								],
 							},
-							{
-								transitionTo: 'whitespace',
-								condition: 'isWhitespace',
-								actions: [
-									"$stack.popAttribute",
-									"$index.increment",
-								],
-							},
-							{
-								actions: [
-									"$stack.addName",
-									"$index.increment",
-								],
-							},
-						]
+						],
 					},
 				},
-				tag: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
+				attributeName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
-								transitionTo: 'tagname',
+								transitionTo: 'afterAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$stack.addEnd',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isClosingTag',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				afterAttributeName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isClosingTag',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				beforeAttributeName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'attributeName',
 								condition: 'isAlphaCharacter',
 								actions: [
-									"$stack.addName",
-									"$index.increment"
+									'$stack.pushAttribute',
+									'$stack.addName',
+									'$index.increment',
 								],
 							},
 							{
-								transitionTo: 'fragment',
-								condition: 'isTagEnd',
-								actions: [
-									"$index.increment",
-									"$stack.popElement",
-								],
-							},
-							{
-								transitionTo: 'invalid',
-								actions: [
-									"$error.invalid_tag_name",
-									"$stack.addInvalid",
-									"$index.increment",
-								],
-							},
-						],
-					},
-				},
-				tagname: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
-					on: {
-						CHARACTER: [
-							{
-								transitionTo: 'tag',
+								transitionTo: 'selfClosingTag',
 								condition: 'isClosingTag',
 								actions: [
-									"$index.increment"
+									'$index.increment',
 								],
-							},
-							{
-								transitionTo: 'whitespace',
-								condition: 'isWhitespace',
-								actions: ["$index.increment"],
 							},
 							{
 								transitionTo: 'invalid',
-								condition: 'isNonAlphaCharacter',
+								condition: 'isNonWhitespace',
 								actions: [
-									"$error.invalid_tag_name",
-									"$stack.addInvalid",
-									"$index.increment",
+									'$error.invalidAttributeName',
+									'$stack.pushInvalid',
+									'$index.increment',
 								],
 							},
 							{
-								actions: ["$stack.addName", "$index.increment"],
+								actions: [
+									'$index.increment',
+								],
 							},
 						],
 					},
 				},
-				whitespace: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
-					on: {
-						CHARACTER: [
-							{
-								transitionTo: 'tag',
-								condition: 'isClosingTag',
-								actions: ["$index.increment"],
-							},
-							{
-								transitionTo: 'attribute',
-								condition: 'isAttribute',
-								actions: [
-									"$stack.pushAttribute",
-									"$stack.addName",
-									"$index.increment",
-								],
-							},
-							{
-								transitionTo: 'invalid',
-								condition: 'isInvalidAttribute',
-								actions: [
-									"$error.invalid_attribute_name",
-									"$stack.addInvalid",
-									"$index.increment",
-								],
-							},
-							{
-								transitionTo: 'invalid',
-								condition: 'isInvalidWhitespace',
-								actions: [
-									"$stack.addInvalid",
-									"$index.increment",
-								],
-							},
-							{
-								actions: ["$index.increment"],
-							},
-						],
-					},
-				},
+				done: {},
 				invalid: {
-					always: [{ transitionTo: "done", condition: "isDone" }],
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
-								transitionTo: 'tag',
-								condition: 'isTagStart',
+								transitionTo: 'tagOpen',
+								condition: 'isTagOpen',
 								actions: [
-									"$stack.addElement",
-									"$index.increment",
+									'$stack.pushTag',
+									'$index.increment',
 								],
 							},
 							{
 								actions: [
-									"$index.increment",
+									'$index.increment',
 								],
 							},
 						],
@@ -303,48 +267,123 @@ export function parser(source) {
 					exit: [{
 						actions: [
 							// Pop invalid element
-							"$stack.popElement",
+							'$stack.popElement',
 							// Pop the element it was parsing before it errored
-							"$stack.popElement"
+							'$stack.popElement'
 						],
 					}]
 				},
-				done: {},
+				selfClosingTag: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+									'$stack.popElement',
+								],
+							},
+							{
+								actions: [
+									'log',
+								],
+							},
+						],
+					},
+				},
+				tagName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+									'$stack.popElement',
+								],
+							},
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isClosingTag',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								condition: 'isNonAlphaCharacter',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				tagOpen: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'tagName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
 			},
 		},
 		conditions: {
 			isAlphaCharacter(value) {
 				return /[A-z]/.test(value);
 			},
-			isAttribute(value) {
-				return /[A-z]/.test(value)
-					&& this.state === 'whitespace'
-					&& this.transition.from === 'tagname';
-			},
 			isClosingTag(value) {
 				return value === '/';
 			},
 			isDone(value) {
+				// TODO: Listen for a EOF char so that we never need the original source
 				return this.data.index === this.data.source.length;
-			},
-			isInvalidAttribute(value) {
-				return this.data.stack.at(-1).type === 'Element'
-					&& !/[A-z\s]/.test(value);
-			},
-			isInvalidWhitespace(value) {
-				return !/\s/.test(value);
 			},
 			isNonAlphaCharacter(value) {
 				return !/[A-z]/.test(value);
 			},
-			isTagStart(value) {
+			isNonWhitespace(value) {
+				return !/\s/.test(value);
+			},
+			isTagOpen(value) {
 				return value === '<';
 			},
-			isTagEnd(value) {
+			isTagClose(value) {
 				return value === '>';
-			},
-			isFromTag() {
-				return this.transition.from === 'tag';
 			},
 			isWhitespace(value) {
 				return /\s/.test(value);
@@ -352,11 +391,8 @@ export function parser(source) {
 		},
 		actions: {
 			log(value) {
-				console.log({
-					...structuredClone(this),
-					value,
-				});
-			}
+				console.log(value, this.state);
+			},
 		}
 	});
 	return parser;
