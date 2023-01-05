@@ -10,6 +10,7 @@
 	$: ({ state, data } = $parserMachine)
 	$: ({ index, source, stack } = data);
 	$: if (index < source.length) {
+		if (index === 0) console.clear();
 		setTimeout(() => {
 			console.log({ value: source[index], index, state });
 			parserMachine.emit.CHARACTER(source[index])
