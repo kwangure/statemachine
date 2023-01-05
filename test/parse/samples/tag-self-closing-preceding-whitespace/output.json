@@ -13,7 +13,7 @@
 				{
 					"error": {
 						"code": "invalid_tag_name",
-						"message": "Expected an alphabet character but instead found ' '"
+						"message": "Expected a valid tag character but instead found ' '"
 					},
 					"start": 1,
 					"end": 8,

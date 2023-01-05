@@ -28,7 +28,7 @@ export function parser(source) {
 				invalid_tag_name(value) {
 					return {
 						code: 'invalid_tag_name',
-						message: `Expected an alphabet character but instead found '${value}'`,
+						message: `Expected a valid tag character but instead found '${value}'`,
 					};
 				},
 				empty: () => null,
@@ -61,24 +61,15 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				addInvalid(value) {
-					let error = {
-						code: 'unknown-error',
-						message: 'Unexpected character',
-					}
-					if (this.transition.from === 'tag') {
-						error = {
-							code: 'invalid_tag_name',
-							message: `Expected an alphabet character but instead found '${value}'`,
-						};
-					} else if (this.transition.from === 'tagname') {
-						error = {
-							code: 'invalid_tag_character',
-							message: `'${value}' is not allowed within tags`,
-						};
-					} else {
+					let error = this.data.error;
+					if (!error) {
 						console.error('Unknown error code', {
 							transition: this.transition,
 						});
+						error = {
+							code: 'unknown-error',
+							message: `Unexpected character '${value}'`,
+						};
 					}
 					const child = /** @type {Invalid} */(invalid({
 						start: this.data.index,
@@ -204,6 +195,7 @@ export function parser(source) {
 							{
 								transitionTo: 'invalid',
 								actions: [
+									"$error.invalid_tag_name",
 									"$stack.addInvalid",
 									"$index.increment",
 								],
@@ -231,6 +223,7 @@ export function parser(source) {
 								transitionTo: 'invalid',
 								condition: 'isNonAlphaCharacter',
 								actions: [
+									"$error.invalid_tag_name",
 									"$stack.addInvalid",
 									"$index.increment",
 								],
@@ -263,6 +256,7 @@ export function parser(source) {
 								transitionTo: 'invalid',
 								condition: 'isInvalidWhitespace',
 								actions: [
+									"$error.invalid_tag_name",
 									"$stack.addInvalid",
 									"$index.increment",
 								],
