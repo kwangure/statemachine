@@ -44,6 +44,21 @@ export function parser(source) {
 						message: `Expected a valid attribute character but instead found '${value}'`,
 					};
 				},
+				unclosedBlock() {
+					const current = /** @type {Attribute|Comment|Element} */(
+						this.data.stack.at(-1)
+					);
+					const types = {
+						Attribute: 'tag',
+						Comment: 'comment',
+						Element: `tag`,
+					};
+					const type = types[current.type] || 'block';
+					return {
+						code: `unclosed-${type}`,
+						message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
+					};
+				},
 			},
 			index: {
 				increment() {
@@ -155,8 +170,10 @@ export function parser(source) {
 						if (!parent) {
 							console.error('Errored element has no parent');
 						} else {
-							if (!parent.children) console.warn('Last has no children');
-							parent.children?.push(nodeWithError);
+							const addTo = nodeWithError.type === 'Attribute'
+								? parent.attributes
+								: parent.children
+							addTo.push(nodeWithError);
 						}
 					}
 					return this.data.stack;
@@ -429,7 +446,18 @@ export function parser(source) {
 						],
 					},
 				},
-				done: {},
+				done: {
+					always: [
+						{
+							transitionTo: 'invalid',
+							actions: [
+								'$error.unclosedBlock',
+								'$stack.pushInvalid',
+							],
+							condition: 'stackNotEmpty',
+						},
+					],
+				},
 				invalid: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
@@ -584,6 +612,9 @@ export function parser(source) {
 			},
 			isWhitespace(value) {
 				return /\s/.test(value);
+			},
+			stackNotEmpty() {
+				return this.data.stack.length > 1;
 			},
 		},
 		actions: {
