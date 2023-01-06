@@ -39,7 +39,7 @@ export type Config<C, A, Condition> = {
 	}>,
 	on?: {
 		[k: string]: {
-			actions?: Actions[],
+			actions?: A[],
 			condition?: Condition,
 			transitionTo?: keyof C['states'],
 		}[],
