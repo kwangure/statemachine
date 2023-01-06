@@ -1,0 +1,31 @@
+{
+	"start": 0,
+	"end": 9,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 9,
+			"type": "Element",
+			"name": "d",
+			"attributes": [
+				{
+					"start": 3,
+					"end": 7,
+					"type": "Attribute",
+					"name": "d",
+					"value": [
+						{
+							"start": 5,
+							"end": 7,
+							"type": "Text",
+							"raw": "ab",
+							"data": "ab"
+						}
+					]
+				}
+			],
+			"children": []
+		}
+	]
+}

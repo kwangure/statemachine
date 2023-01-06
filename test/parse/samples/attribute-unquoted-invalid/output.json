@@ -1,0 +1,58 @@
+{
+	"start": 0,
+	"end": 10,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 10,
+			"type": "Element",
+			"name": "d",
+			"attributes": [
+				{
+					"start": 3,
+					"end": 10,
+					"type": "Attribute",
+					"name": "d",
+					"value": [
+						{
+							"start": 5,
+							"end": 10,
+							"type": "Text",
+							"raw": "ab",
+							"data": "",
+							"error": {
+								"error": {
+									"code": "invalid_unquoted_value",
+									"message": "'\"' is not permitted in unquoted attribute values"
+								},
+								"start": 7,
+								"end": 10,
+								"type": "Invalid"
+							}
+						}
+					],
+					"error": {
+						"error": {
+							"code": "unclosed-tag",
+							"message": "Tag was left open"
+						},
+						"start": 10,
+						"end": 10,
+						"type": "Invalid"
+					}
+				}
+			],
+			"children": [],
+			"error": {
+				"error": {
+					"code": "unclosed-tag",
+					"message": "Tag was left open"
+				},
+				"start": 10,
+				"end": 10,
+				"type": "Invalid"
+			}
+		}
+	]
+}

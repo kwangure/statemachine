@@ -1,0 +1,55 @@
+{
+	"start": 0,
+	"end": 22,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 11,
+			"type": "Element",
+			"name": "d",
+			"attributes": [
+				{
+					"start": 3,
+					"end": 9,
+					"type": "Attribute",
+					"name": "d",
+					"value": [
+						{
+							"start": 6,
+							"end": 8,
+							"type": "Text",
+							"raw": "12",
+							"data": "12"
+						}
+					]
+				}
+			],
+			"children": []
+		},
+		{
+			"start": 11,
+			"end": 22,
+			"type": "Element",
+			"name": "d",
+			"attributes": [
+				{
+					"start": 14,
+					"end": 20,
+					"type": "Attribute",
+					"name": "d",
+					"value": [
+						{
+							"start": 17,
+							"end": 19,
+							"type": "Text",
+							"raw": "ab",
+							"data": "ab"
+						}
+					]
+				}
+			],
+			"children": []
+		}
+	]
+}

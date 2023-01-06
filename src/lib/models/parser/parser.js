@@ -1,5 +1,12 @@
-import { attribute, comment, element, fragment, invalid } from './nodes/nodes';
+import { attribute, comment, element, fragment, invalid, text } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
+
+/**
+ * @param {string} char
+ */
+function quoteChar(char) {
+	return char === '\'' ? `"${char}"` : `'${char}'`;
+}
 
 /**
  * @typedef {import('./nodes/types').Attribute} Attribute
@@ -8,6 +15,7 @@ import { Machine } from '$lib/machine/create';
  * @typedef {import('./nodes/types').Fragment} Fragment
  * @typedef {import('./nodes/types').Invalid} Invalid
  * @typedef {import('./nodes/types').TemplateNode} TemplateNode
+ * @typedef {import('./nodes/types').Text} Text
  */
 /**
  * @param {string} source
@@ -22,6 +30,7 @@ export function parser(source) {
 			html,
 			source,
 			stack,
+			openQuote: /** @type {'"' | '\''} */'\'',
 			error: /** @type {{ code: string; message: string } | null} */(null),
 		},
 		ops: {
@@ -29,20 +38,26 @@ export function parser(source) {
 				incompleteComment(value) {
 					return {
 						code: 'incomplete_comment',
-						message: `Expected a valid comment character but instead found '${value}'`,
+						message: `Expected a valid comment character but instead found ${quoteChar(value)}`,
 					};
 				},
 				invalidTagName(value) {
 					return {
 						code: 'invalid_tag_name',
-						message: `Expected a valid tag character but instead found '${value}'`,
+						message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
 					};
 				},
 				invalidAttributeName(value) {
 					return {
 						code: 'invalid_attribute_name',
-						message: `Expected a valid attribute character but instead found '${value}'`,
+						message: `Expected a valid attribute character but instead found ${quoteChar(value)}`,
 					};
+				},
+				invalidUnquotedValue(value) {
+					return {
+						code: 'invalid_unquoted_value',
+						message: `${quoteChar(value)} is not permitted in unquoted attribute values`
+					}
 				},
 				unclosedBlock() {
 					const current = /** @type {Attribute|Comment|Element} */(
@@ -66,6 +81,11 @@ export function parser(source) {
 				},
 			},
 			html: {},
+			openQuote: {
+				set(value) {
+					return value;
+				},
+			},
 			source: {},
 			stack: {
 				addData(value) {
@@ -76,6 +96,15 @@ export function parser(source) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.data += value;
+					}
+					return this.data.stack;
+				},
+				addEnd() {
+					const current = this.data.stack.at(-1);
+					if (!current) {
+						console.error('There\'s no item on the stack.');
+					} else {
+						current.end = this.data.index;
 					}
 					return this.data.stack;
 				},
@@ -90,12 +119,14 @@ export function parser(source) {
 					}
 					return this.data.stack;
 				},
-				addEnd() {
+				addRaw(value) {
 					const current = this.data.stack.at(-1);
 					if (!current) {
 						console.error('There\'s no item on the stack.');
+					} else if (!Object.hasOwn(current, 'raw')) {
+						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
-						current.end = this.data.index;
+						current.raw += value;
 					}
 					return this.data.stack;
 				},
@@ -107,7 +138,10 @@ export function parser(source) {
 						console.error('Popped element is not an attribute');
 					} else {
 						if (Array.isArray(current.value) && !current.value.length) {
+							current.end = current.start + current.name.length;
 							current.value = true;
+						} else {
+							current.end = this.data.index;
 						}
 						const last = this.data.stack.at(-1);
 						if (!last) {
@@ -170,10 +204,52 @@ export function parser(source) {
 						if (!parent) {
 							console.error('Errored element has no parent');
 						} else {
-							const addTo = nodeWithError.type === 'Attribute'
-								? parent.attributes
-								: parent.children
-							addTo.push(nodeWithError);
+							switch (nodeWithError.type) {
+								case 'Text':
+									// Attribute
+									parent.value.push(nodeWithError);
+									break;
+								case 'Attribute':
+									// Element
+									parent.attributes.push(nodeWithError);
+									break;
+								case 'Comment':
+								case 'Element':
+									// Fragment | Element
+									parent.children?.push(nodeWithError);
+									break;
+								default:
+									console.error('Unable to add invalid node to parent. Not implemented?', {
+										nodeWithError,
+										parent,
+									});
+									break;
+							}
+						}
+					}
+					return this.data.stack;
+				},
+				popText() {
+					const current = this.data.stack.pop();
+					if (!current) {
+						console.error('Popped from an empty stack.');
+					} else if (current.type !== 'Text') {
+						console.error('Popped element is not an text node');
+					} else {
+						const last = this.data.stack.at(-1);
+						current.end = this.data.index;
+						// TODO: decode html character entities
+						// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+						current.data = current.raw;
+						if (!last) {
+							console.error('The last element should not be popped');
+						} else {
+							if (last.type !== 'Attribute') {
+								console.error('Parent is not an attribute', structuredClone(last))
+							} else {
+								// Because TypeScript
+								if (Array.isArray(last.value)) last.value.push(current);
+							}
 						}
 					}
 					return this.data.stack;
@@ -227,6 +303,15 @@ export function parser(source) {
 					this.data.stack.push(child);
 					return this.data.stack;
 				},
+				pushText() {
+					const child = /** @type {Text} */(text({
+						start: this.data.index,
+						data: '',
+						raw: '',
+					}));
+					this.data.stack.push(child);
+					return this.data.stack;
+				},
 			},
 		},
 		config: {
@@ -246,7 +331,7 @@ export function parser(source) {
 						],
 					},
 				},
-				attributeName: {
+				afterAttributeName: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
@@ -254,51 +339,78 @@ export function parser(source) {
 								transitionTo: 'afterAttributeName',
 								condition: 'isWhitespace',
 								actions: [
-									'$stack.addEnd',
 									'$index.increment',
 								],
 							},
 							{
 								transitionTo: 'selfClosingTag',
-								condition: 'isClosingTag',
+								condition: 'isForwardSlash',
 								actions: [
 									'$stack.popAttribute',
 									'$index.increment',
 								],
 							},
 							{
+								transitionTo: 'beforeAttributeValue',
+								condition: 'isEquals',
 								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'attributeName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.popAttribute',
+									'$stack.pushAttribute',
 									'$stack.addName',
 									'$index.increment',
 								],
 							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidAttributeName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
 						],
 					},
 				},
-				afterAttributeName: {
+				afterAttributeValueQuoted: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
+							{
+								transitionTo: 'beforeAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
 							{
 								transitionTo: 'selfClosingTag',
-								condition: 'isClosingTag',
+								condition: 'isForwardSlash',
 								actions: [
-									'$stack.popAttribute',
 									'$index.increment',
 								],
 							},
 							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
 								actions: [
 									'$index.increment',
 								],
 							},
-						],
-					},
-				},
-				beforeAttributeName: {
-					always: [{ transitionTo: 'done', condition: 'isDone' }],
-					on: {
-						CHARACTER: [
 							{
 								transitionTo: 'attributeName',
 								condition: 'isAlphaCharacter',
@@ -309,23 +421,10 @@ export function parser(source) {
 								],
 							},
 							{
-								transitionTo: 'selfClosingTag',
-								condition: 'isClosingTag',
-								actions: [
-									'$index.increment',
-								],
-							},
-							{
 								transitionTo: 'invalid',
-								condition: 'isNonWhitespace',
 								actions: [
 									'$error.invalidAttributeName',
 									'$stack.pushInvalid',
-									'$index.increment',
-								],
-							},
-							{
-								actions: [
 									'$index.increment',
 								],
 							},
@@ -355,6 +454,7 @@ export function parser(source) {
 					},
 				},
 				afterCommentContent: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
@@ -375,7 +475,215 @@ export function parser(source) {
 						],
 					},
 				},
+				attributeName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'afterAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isForwardSlash',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'beforeAttributeValue',
+								condition: 'isEquals',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								condition: 'isNonAlphaCharacter',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				attributeValueQuoted: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'afterAttributeValueQuoted',
+								condition: 'isQuoteClosed',
+								actions: [
+									'$stack.popText',
+									'$index.increment',
+									'$stack.popAttribute',
+								],
+							},
+							{
+								actions: [
+									'$stack.addRaw',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				attributeValueUnquoted: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$stack.popText',
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$stack.popText',
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isForwardSlash',
+								actions: [
+									'$stack.popText',
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								condition: 'isInvalidUnquotedValue',
+								actions: [
+									'$error.invalidUnquotedValue',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addRaw',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				beforeAttributeName: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeAttributeName',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'selfClosingTag',
+								condition: 'isForwardSlash',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'attributeName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.pushAttribute',
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidAttributeName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				beforeAttributeValue: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeAttributeValue',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'attributeValueQuoted',
+								condition: 'isQuote',
+								actions: [
+									'$openQuote.set',
+									'$index.increment',
+									'$stack.pushText',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$stack.popAttribute',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'attributeValueUnquoted',
+								actions: [
+									'$stack.pushText',
+									'$stack.addRaw',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
 				beforeCommentEnd: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
@@ -427,6 +735,7 @@ export function parser(source) {
 					},
 				},
 				commentContent: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
 						CHARACTER: [
 							{
@@ -525,7 +834,7 @@ export function parser(source) {
 							},
 							{
 								transitionTo: 'selfClosingTag',
-								condition: 'isClosingTag',
+								condition: 'isForwardSlash',
 								actions: [
 									'$index.increment',
 								],
@@ -585,15 +894,21 @@ export function parser(source) {
 			isAlphaCharacter(value) {
 				return /[A-z]/.test(value);
 			},
-			isClosingTag(value) {
-				return value === '/';
+			isEquals(value) {
+				return value === '=';
 			},
 			isExclamation(value) {
 				return value === '!';
 			},
+			isForwardSlash(value) {
+				return value === '/';
+			},
 			isDone(value) {
 				// TODO: Listen for a EOF char so that we never need the original source
 				return this.data.index === this.data.source.length;
+			},
+			isInvalidUnquotedValue(value) {
+				return /[\s"'=<>`]/.test(value);
 			},
 			isMinus(value) {
 				return value === '-';
@@ -601,8 +916,11 @@ export function parser(source) {
 			isNonAlphaCharacter(value) {
 				return !/[A-z]/.test(value);
 			},
-			isNonWhitespace(value) {
-				return !/\s/.test(value);
+			isQuote(value) {
+				return value === '"' || value === '\'';
+			},
+			isQuoteClosed(value) {
+				return value === this.data.openQuote;
 			},
 			isTagOpen(value) {
 				return value === '<';
@@ -619,7 +937,11 @@ export function parser(source) {
 		},
 		actions: {
 			log(value) {
-				console.log(value, this.state);
+				console.log(structuredClone({
+					value,
+					state: this.state,
+					transition: this.transition,
+				}));
 			},
 		}
 	});

@@ -5,6 +5,7 @@
  * @typedef {import('./types').Fragment} Fragment
  * @typedef {import('./types').Invalid} Invalid
  * @typedef {import('./types').TemplateNode} TemplateNode
+ * @typedef {import('./types').Text} Text
  */
 
 /**
@@ -96,5 +97,25 @@ export function invalid({ error, start, end }) {
 		start,
 		end,
 		type: 'Invalid',
+	};
+}
+
+/**
+ * @param {Object} options
+ * @param {string} options.data
+ * @param {string} options.raw
+ * @param {number} options.start
+ * @param {number} [options.end]
+ * @return {import('type-fest').SetOptional<Text, 'end'>}
+ */
+export function text({ data, raw, start, end }) {
+	// Sort the object properties in the same order as the Svelte compiler to make
+	// tests and debugging easier
+	return {
+		start,
+		end,
+		type: 'Text',
+		raw,
+		data,
 	};
 }
