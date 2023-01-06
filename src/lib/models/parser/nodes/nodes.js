@@ -1,5 +1,6 @@
 /**
  * @typedef {import('./types').Attribute} Attribute
+ * @typedef {import('./types').Comment} Comment
  * @typedef {import('./types').Element} Element
  * @typedef {import('./types').Fragment} Fragment
  * @typedef {import('./types').Invalid} Invalid
@@ -42,6 +43,25 @@ export function element({ name, start, end }) {
 		name,
 		attributes: /** @type {Attribute[]} */([]),
 		children: /** @type {TemplateNode[]} */([]),
+	};
+}
+
+/**
+ * @param {Object} options
+ * @param {string} options.data
+ * @param {number} options.start
+ * @param {number} [options.end]
+ * @return {import('type-fest').SetOptional<Comment, 'end'>}
+ */
+export function comment({ data, start, end }) {
+	// Sort the object properties in the same order as the Svelte compiler to make
+	// tests and debugging easier
+	return {
+		start,
+		end,
+		type: 'Comment',
+		data,
+		ignores: /** @type {string[]} */([]),
 	};
 }
 

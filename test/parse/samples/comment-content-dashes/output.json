@@ -1,0 +1,22 @@
+{
+	"start": 0,
+	"end": 18,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 12,
+			"type": "Comment",
+			"data": " a-- ",
+			"ignores": []
+		},
+		{
+			"start": 12,
+			"end": 18,
+			"type": "Element",
+			"name": "div",
+			"attributes": [],
+			"children": []
+		}
+	]
+}

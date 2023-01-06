@@ -1,8 +1,9 @@
-import { attribute, element, fragment, invalid } from './nodes/nodes';
+import { attribute, comment, element, fragment, invalid } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
 
 /**
  * @typedef {import('./nodes/types').Attribute} Attribute
+ * @typedef {import('./nodes/types').Comment} Comment
  * @typedef {import('./nodes/types').Element} Element
  * @typedef {import('./nodes/types').Fragment} Fragment
  * @typedef {import('./nodes/types').Invalid} Invalid
@@ -25,6 +26,12 @@ export function parser(source) {
 		},
 		ops: {
 			error: {
+				incompleteComment(value) {
+					return {
+						code: 'incomplete_comment',
+						message: `Expected a valid comment character but instead found '${value}'`,
+					};
+				},
 				invalidTagName(value) {
 					return {
 						code: 'invalid_tag_name',
@@ -46,6 +53,17 @@ export function parser(source) {
 			html: {},
 			source: {},
 			stack: {
+				addData(value) {
+					const current = this.data.stack.at(-1);
+					if (!current) {
+						console.error('There\'s no item on the stack.');
+					} else if (!Object.hasOwn(current, 'data')) {
+						console.error('Invalid tag name. Adding ', value, 'to', current);
+					} else {
+						current.data += value;
+					}
+					return this.data.stack;
+				},
 				addName(value) {
 					const current = this.data.stack.at(-1);
 					if (!current) {
@@ -85,6 +103,25 @@ export function parser(source) {
 							} else {
 								last.attributes?.push(current);
 							}
+						}
+					}
+					return this.data.stack;
+				},
+				popComment() {
+					const current = (this.data.stack.pop());
+					if (!current) {
+						console.error('Popped from an empty stack.');
+					} else if (current.type !== 'Comment') {
+						console.error('Attempted pop non-comment');
+					} else {
+						current.data = current.data.slice(0, -2)
+						current.end = this.data.index;
+						const last = this.data.stack.at(-1);
+						if (!last) {
+							console.error('The last element should not be popped');
+						} else {
+							if (!last.children) console.warn('Last has no children');
+							last.children?.push(current);
 						}
 					}
 					return this.data.stack;
@@ -130,6 +167,21 @@ export function parser(source) {
 						name: '',
 					}));
 					this.data.stack.push(child);
+					return this.data.stack;
+				},
+				pushComment() {
+					const tag = this.data.stack.pop();
+					if (!tag) {
+						console.error('No tag found');
+					} else if (tag.type !== 'Element') {
+						console.error('Attempted to turn non-element to comment');
+					} else {
+						const child = /** @type {Comment} */(comment({
+							start: tag.start,
+							data: '',
+						}));
+						this.data.stack.push(child);
+					}
 					return this.data.stack;
 				},
 				pushInvalid(value) {
@@ -263,6 +315,120 @@ export function parser(source) {
 						],
 					},
 				},
+				afterCommentBang: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeCommentStart',
+								condition: 'isMinus',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.incompleteComment',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				afterCommentContent: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeCommentEnd',
+								condition: 'isMinus',
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'commentContent',
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				beforeCommentEnd: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+									'$stack.popComment',
+								],
+							},
+							{
+								transitionTo: 'beforeCommentEnd',
+								condition: 'isMinus',
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'commentContent',
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				beforeCommentStart: {
+					always: [{ transitionTo: 'done', condition: 'isDone' }],
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'commentContent',
+								condition: 'isMinus',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.incompleteComment',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				commentContent: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'afterCommentContent',
+								condition: 'isMinus',
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addData',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
 				done: {},
 				invalid: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
@@ -289,6 +455,7 @@ export function parser(source) {
 						],
 					}]
 				},
+				notImplemented: {},
 				selfClosingTag: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
@@ -366,6 +533,14 @@ export function parser(source) {
 								],
 							},
 							{
+								transitionTo: 'afterCommentBang',
+								condition: 'isExclamation',
+								actions: [
+									'$stack.pushComment',
+									'$index.increment',
+								],
+							},
+							{
 								transitionTo: 'invalid',
 								actions: [
 									'$error.invalidTagName',
@@ -385,9 +560,15 @@ export function parser(source) {
 			isClosingTag(value) {
 				return value === '/';
 			},
+			isExclamation(value) {
+				return value === '!';
+			},
 			isDone(value) {
 				// TODO: Listen for a EOF char so that we never need the original source
 				return this.data.index === this.data.source.length;
+			},
+			isMinus(value) {
+				return value === '-';
 			},
 			isNonAlphaCharacter(value) {
 				return !/[A-z]/.test(value);

@@ -3,6 +3,7 @@ interface BaseNode {
 	end: number;
 	type: string;
 	children?: TemplateNode[];
+	error?: Invalid;
 	[prop_name: string]: any;
 }
 
@@ -14,6 +15,12 @@ export interface Fragment extends BaseNode {
 export interface Text extends BaseNode {
 	type: 'Text';
 	data: string;
+}
+
+export interface Comment extends BaseNode {
+	type: 'Comment';
+	data: string;
+	ignores: string[];
 }
 
 export interface Element extends BaseNode {
@@ -36,4 +43,9 @@ export interface Invalid extends BaseNode {
 	};
 }
 
-export type TemplateNode = Attribute | Element | Fragment | Invalid | Text;
+export type TemplateNode = Attribute
+| Comment
+| Element
+| Fragment
+| Invalid
+| Text;
