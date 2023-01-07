@@ -3,8 +3,9 @@
 	import { parser as stateParser } from '$lib/models/parser';
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
+    import Diff from '$lib/components/diff/diff.svelte';
 
-	const code = '<div  +abc/>';
+	const code = '<div/>';
 	const parserMachine = stateParser(code);
 	let showing = 'statemachine';
 
@@ -17,8 +18,11 @@
 			parserMachine.emit.CHARACTER(source[index])
 		}, 100);
 	}
-	$: rendered = render(index);
-
+	$: rendered = renderParsing(index);
+	$: [svelteJson, stateMachineJson] = [
+		JSON.stringify(parse(code), null, 4),
+		JSON.stringify({ html: stack[0]}, null, 4),
+	];
 
 	/**
      * @param {string} code
@@ -33,7 +37,7 @@
 	/**
      * @param {number} index
      */
-	function render(index) {
+	function renderParsing(index) {
 		const seen = source.substring(0, index);
 		const current = source[index];
 		const unseen = source.substring(index + 1);
@@ -42,10 +46,6 @@
 			`<span class='current'>${escape(current)}</span>`,
 			`<span class='unseen'>${escape(unseen)}</span>`,
 		].join('');
-	}
-
-	function toggleShowing() {
-		showing = showing === 'statemachine' ? 'svelte' : 'statemachine';
 	}
 </script>
 <pre>
@@ -60,13 +60,29 @@
 		{/if}
 	</div>
 	<div class="code">
-		<button on:click={toggleShowing}>Toggle Parser</button>
+		<div class="buttons">
+			<button on:click={() => showing = 'statemachine'}>
+				State Machine
+			</button>
+			<button on:click={() => showing = 'svelte'}>
+				Svelte
+			</button>
+			<button on:click={() => showing = 'diff'}>
+				Diff
+			</button>
+		</div>
 		{#if showing === 'statemachine'}
 			<h3>State Machine</h3>
-			<Code highlight={json} code={JSON.stringify(stack, null, 4)}/>
+			<Code highlight={json} code={stateMachineJson}/>
 		{:else if showing === 'svelte'}
 			<h3>Svelte</h3>
-			<Code highlight={json} code={JSON.stringify(parse(code), null, 4)}/>
+			<Code highlight={json} code={svelteJson}/>
+		{:else if showing === 'diff'}
+			<h3>Diff</h3>
+			<Diff currentCode={stateMachineJson}
+				currentCodeHighlight={json}
+				originalCode={svelteJson}
+				originalCodeHighlight={json}/>
 		{/if}
 	</div>
 </div>
@@ -83,6 +99,10 @@
 	.desk {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
+	}
+	.buttons {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
 	}
 	.code {
 		display: grid;
