@@ -27,6 +27,7 @@ export interface Element extends BaseNode {
 	type: 'Element';
 	name: string;
 	attributes: Array<Attribute>;
+	children: TemplateNode[];
 }
 
 export interface Attribute extends BaseNode {

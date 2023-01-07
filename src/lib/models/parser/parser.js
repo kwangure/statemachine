@@ -1,5 +1,6 @@
 import { attribute, comment, element, fragment, invalid, text } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
+import { isVoidElement } from './utlils';
 
 /**
  * @param {string} char
@@ -45,6 +46,14 @@ export function parser(source) {
 					return {
 						code: 'invalid_tag_name',
 						message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
+					};
+				},
+				invalidVoidContent() {
+					const current = /** @type {Element} */(this.data.stack.at(-1));
+
+					return {
+						code: 'invalid-void-content',
+						message: `<${current.name}> is a void element and cannot have children, or a closing tag`
 					};
 				},
 				invalidAttributeName(value) {
@@ -179,14 +188,59 @@ export function parser(source) {
 					const current = this.data.stack.pop();
 					if (!current) {
 						console.error('Popped from an empty stack.');
+					} else if (current.type !== 'Element') {
+						console.error('Attempted pop non-element');
 					} else {
-						current.end = this.data.index;
-						const last = this.data.stack.at(-1);
-						if (!last) {
-							console.error('The last element should not be popped');
+						if (
+							this.transition.from === 'endTagName'
+							|| this.transition.from === 'beforeEndTagClose'
+						) {
+							let parentTag = this.data.stack.pop();
+							if (!parentTag) {
+								console.error('popped from an empty stack');
+							} else {
+								// close any elements that don't have their own closing tags, e.g. <div><p></div>
+								while (parentTag.name !== current.name) {
+									// TODO: handle autoclosed tags
+									if (parentTag.type !== 'Element') {
+										console.error('Autoclose tags not implemented');
+									// 	const error = parser.last_auto_closed_tag && parser.last_auto_closed_tag.tag === name
+									// 		? parser_errors.invalid_closing_tag_autoclosed(name, parser.last_auto_closed_tag.reason)
+									// 		: parser_errors.invalid_closing_tag_unopened(name);
+									// 	parser.error(error, start);
+									}
+
+									parentTag.end = current.start;
+									const nextParent = this.data.stack.pop();
+									if (!nextParent) {
+										console.error('popped from an empty stack');
+										break;
+									} else if (!nextParent.children) {
+										console.error("Autoclose element without valid parent");
+										break;
+									} else {
+										nextParent.children.push(parentTag);
+										parentTag = nextParent;
+									}
+								}
+								parentTag.end = this.data.index;
+								const last = this.data.stack.at(-1);
+								if (!last) {
+									console.error('The last element should not be popped');
+								} else {
+									if (!last.children) console.warn('Last has no children');
+									last.children?.push(parentTag);
+								}
+							}
 						} else {
-							if (!last.children) console.warn('Last has no children');
-							last.children?.push(current);
+							current.end = this.data.index;
+							const last = this.data.stack.at(-1);
+							if (!last) {
+								console.error('The last element should not be popped');
+							} else {
+								if (!last.children) console.warn('Last has no children');
+								last.children?.push(current);
+							}
 						}
 					}
 					return this.data.stack;
@@ -734,6 +788,35 @@ export function parser(source) {
 						],
 					},
 				},
+				beforeEndTagClose: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+									'$stack.popElement',
+								],
+							},
+							{
+								transitionTo: 'beforeEndTagClose',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
 				commentContent: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
 					on: {
@@ -766,6 +849,103 @@ export function parser(source) {
 							condition: 'stackNotEmpty',
 						},
 					],
+				},
+				endTagName: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'beforeEndTagClose',
+								condition: 'isWhitespace',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'endTagVoid',
+								condition: 'isVoidTag',
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'fragment',
+								condition: 'isTagClose',
+								actions: [
+									'$index.increment',
+									'$stack.popElement',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								condition: 'isNonAlphaCharacter',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+							{
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				endTagOpen: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'endTagName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
+				},
+				endTagVoid: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'endTagName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.addName',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								condition: 'isTagClose',
+								actions: [
+									'$error.invalidVoidContent',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'invalid',
+								actions: [
+									'$error.invalidTagName',
+									'$stack.pushInvalid',
+									'$index.increment',
+								],
+							},
+						],
+					},
 				},
 				invalid: {
 					always: [{ transitionTo: 'done', condition: 'isDone' }],
@@ -829,7 +1009,6 @@ export function parser(source) {
 								condition: 'isTagClose',
 								actions: [
 									'$index.increment',
-									'$stack.popElement',
 								],
 							},
 							{
@@ -862,18 +1041,26 @@ export function parser(source) {
 					on: {
 						CHARACTER: [
 							{
-								transitionTo: 'tagName',
-								condition: 'isAlphaCharacter',
-								actions: [
-									'$stack.addName',
-									'$index.increment',
-								],
-							},
-							{
+								// TODO: Parse doctype
 								transitionTo: 'afterCommentBang',
 								condition: 'isExclamation',
 								actions: [
 									'$stack.pushComment',
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'endTagOpen',
+								condition: 'isForwardSlash',
+								actions: [
+									'$index.increment',
+								],
+							},
+							{
+								transitionTo: 'tagName',
+								condition: 'isAlphaCharacter',
+								actions: [
+									'$stack.addName',
 									'$index.increment',
 								],
 							},
@@ -927,6 +1114,10 @@ export function parser(source) {
 			},
 			isTagClose(value) {
 				return value === '>';
+			},
+			isVoidTag(value) {
+				const current = /** @type {Element} */(this.data.stack.at(-1));
+				return isVoidElement(current.name + value);
 			},
 			isWhitespace(value) {
 				return /\s/.test(value);

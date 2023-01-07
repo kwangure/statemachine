@@ -21,7 +21,7 @@
 	$: rendered = renderParsing(index);
 	$: [svelteJson, stateMachineJson] = [
 		JSON.stringify(parse(code), null, 4),
-		JSON.stringify({ html: stack[0]}, null, 4),
+		JSON.stringify(stack, null, 4),
 	];
 
 	/**

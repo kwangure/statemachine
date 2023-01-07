@@ -1,0 +1,42 @@
+{
+	"start": 0,
+	"end": 12,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 12,
+			"type": "Element",
+			"name": "div",
+			"attributes": [],
+			"children": [
+				{
+					"start": 5,
+					"end": 12,
+					"type": "Element",
+					"name": "",
+					"attributes": [],
+					"children": [],
+					"error": {
+						"error": {
+							"code": "invalid_tag_name",
+							"message": "Expected a valid tag character but instead found ' '"
+						},
+						"start": 7,
+						"end": 12,
+						"type": "Invalid"
+					}
+				}
+			],
+			"error": {
+				"error": {
+					"code": "unclosed-tag",
+					"message": "Tag was left open"
+				},
+				"start": 12,
+				"end": 12,
+				"type": "Invalid"
+			}
+		}
+	]
+}
