@@ -298,11 +298,13 @@ export function parser(source) {
 						if (!last) {
 							console.error('The last element should not be popped');
 						} else {
-							if (last.type !== 'Attribute') {
-								console.error('Parent is not an attribute', structuredClone(last))
-							} else {
+							if (last.type === 'Attribute') {
 								// Because TypeScript
 								if (Array.isArray(last.value)) last.value.push(current);
+							} else if (last.type === 'Element' || last.type === 'Fragment') {
+								last.children.push(current);
+							} else {
+								console.error('Parent does not take text nodes', structuredClone(last))
 							}
 						}
 					}
@@ -382,6 +384,14 @@ export function parser(source) {
 									'$index.increment',
 								],
 							},
+							{
+								transitionTo: 'text',
+								actions: [
+									'$stack.pushText',
+									'$stack.addRaw',
+									'$index.increment',
+								],
+							}
 						],
 					},
 				},
@@ -1071,6 +1081,28 @@ export function parser(source) {
 									'$stack.pushInvalid',
 									'$index.increment',
 								],
+							},
+						],
+					},
+				},
+				text: {
+					on: {
+						CHARACTER: [
+							{
+								transitionTo: 'tagOpen',
+								condition: 'isTagOpen',
+								actions: [
+									'$stack.popText',
+									'$stack.pushTag',
+									'$index.increment',
+								],
+							},
+							// TODO: Mustache here
+							{
+								actions: [
+									'$stack.addRaw',
+									'$index.increment',
+								]
 							},
 						],
 					},
