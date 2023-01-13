@@ -1,14 +1,16 @@
 <script>
 	import { Code, json } from '@kwangure/strawberry/default/code';
+	import { Container } from '@kwangure/strawberry/default/input/container';
 	import { parser as stateParser } from '$lib/models/parser';
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
     import Diff from '$lib/components/diff/diff.svelte';
+    import { localStorageWritable } from '$lib/stores/localStorageWritable';
 
-	const code = '<div/>';
-	const parserMachine = stateParser(code);
+	let code = localStorageWritable('code', '');
 	let showing = 'statemachine';
 
+	$: parserMachine = stateParser($code);
 	$: ({ state, data } = $parserMachine)
 	$: ({ index, source, stack } = data);
 	$: if (index < source.length) {
@@ -16,11 +18,11 @@
 		setTimeout(() => {
 			console.log({ value: source[index], index, state });
 			parserMachine.emit.CHARACTER(source[index])
-		}, 100);
+		}, 0);
 	}
 	$: rendered = renderParsing(index);
 	$: [svelteJson, stateMachineJson] = [
-		JSON.stringify(parse(code), null, 4),
+		JSON.stringify(parse($code), null, 4),
 		JSON.stringify(stack, null, 4),
 	];
 
@@ -53,6 +55,9 @@
 </pre>
 <div class="desk">
 	<div>
+		<Container>
+			<textarea bind:value={$code}/>
+		</Container>
 		{#if state === 'done'}
 			<pre class="source seen">{source}</pre>
 		{:else}
