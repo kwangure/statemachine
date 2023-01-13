@@ -31,6 +31,7 @@ export function parser(source) {
 			html,
 			source,
 			stack,
+			maybeStack: /** @type {TemplateNode[]} */([]),
 			openQuote: /** @type {'"' | '\''} */'\'',
 			error: /** @type {{ code: string; message: string } | null} */(null),
 		},
@@ -90,6 +91,62 @@ export function parser(source) {
 				},
 			},
 			html: {},
+			maybeStack: {
+				addRaw(value) {
+					const current = this.data.maybeStack.at(-1);
+					if (!current) {
+						console.error('There\'s no item on the maybeStack.');
+					} else if (!Object.hasOwn(current, 'raw')) {
+						console.error('Invalid tag name. Adding ', value, 'to', current);
+					} else {
+						current.raw += value;
+					}
+					return this.data.maybeStack;
+				},
+				pop() {
+					const current = this.data.maybeStack.pop();
+					if (!current) {
+						console.error('Popped from an empty maybeStack.');
+					}
+					return this.data.maybeStack;
+				},
+				popText() {
+					const current = this.data.maybeStack.pop();
+					if (!current) {
+						console.error('Popped from an empty maybeStack.');
+					} else if (current.type !== 'Text') {
+						console.error('Popped element is not an text node');
+					} else {
+						const last = this.data.maybeStack.at(-1);
+						current.end = this.data.index;
+						// TODO: decode html character entities
+						// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+						current.data = current.raw;
+						if (!last) {
+							console.error('The last element should not be popped');
+						} else {
+							if (last.type === 'Attribute') {
+								// Because TypeScript
+								if (Array.isArray(last.value)) last.value.push(current);
+							} else if (last.type === 'Element' || last.type === 'Fragment') {
+								last.children.push(current);
+							} else {
+								console.error('Parent does not take text nodes', structuredClone(last))
+							}
+						}
+					}
+					return this.data.maybeStack;
+				},
+				pushText() {
+					const child = /** @type {Text} */(text({
+						start: this.data.index,
+						data: '',
+						raw: '',
+					}));
+					this.data.maybeStack.push(child);
+					return this.data.maybeStack;
+				},
+			},
 			openQuote: {
 				set(value) {
 					return value;
@@ -136,6 +193,22 @@ export function parser(source) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.raw += value;
+					}
+					return this.data.stack;
+				},
+				fromMaybeStack() {
+					const current = this.data.maybeStack.at(-1);
+					if (!current) {
+						console.error('There\'s no item on the stack.');
+					} else {
+						this.data.stack.push(current);
+					}
+					return this.data.stack;
+				},
+				pop() {
+					const current = this.data.stack.pop();
+					if (!current) {
+						console.error('Popped from an empty stack.');
 					}
 					return this.data.stack;
 				},
@@ -298,11 +371,23 @@ export function parser(source) {
 						if (!last) {
 							console.error('The last element should not be popped');
 						} else {
+							let addTo = null;
 							if (last.type === 'Attribute') {
 								// Because TypeScript
-								if (Array.isArray(last.value)) last.value.push(current);
+								if (Array.isArray(last.value)) addTo = last.value;
 							} else if (last.type === 'Element' || last.type === 'Fragment') {
-								last.children.push(current);
+								addTo = last.children;
+							}
+
+							if (addTo) {
+								const lastChild = addTo.at(-1);
+								if (lastChild?.type === 'Text') {
+									lastChild.end = current.end;
+									lastChild.raw += current.raw;
+									lastChild.data = lastChild.raw;
+								} else {
+									addTo.push(current);
+								}
 							} else {
 								console.error('Parent does not take text nodes', structuredClone(last))
 							}
@@ -380,6 +465,8 @@ export function parser(source) {
 								transitionTo: 'tagOpen',
 								condition: 'isTagOpen',
 								actions: [
+									'$maybeStack.pushText',
+									'$maybeStack.addRaw',
 									'$stack.pushTag',
 									'$index.increment',
 								],
@@ -911,6 +998,7 @@ export function parser(source) {
 								transitionTo: 'endTagName',
 								condition: 'isAlphaCharacter',
 								actions: [
+									'$maybeStack.pop',
 									'$stack.addName',
 									'$index.increment',
 								],
@@ -1070,15 +1158,18 @@ export function parser(source) {
 								transitionTo: 'tagName',
 								condition: 'isAlphaCharacter',
 								actions: [
+									'$maybeStack.pop',
 									'$stack.addName',
 									'$index.increment',
 								],
 							},
 							{
-								transitionTo: 'invalid',
+								transitionTo: 'text',
 								actions: [
-									'$error.invalidTagName',
-									'$stack.pushInvalid',
+									'$stack.pop',
+									'$stack.fromMaybeStack',
+									'$maybeStack.pop',
+									'$stack.addRaw',
 									'$index.increment',
 								],
 							},
@@ -1086,12 +1177,21 @@ export function parser(source) {
 					},
 				},
 				text: {
+					always: [{
+						transitionTo: 'done',
+						condition: 'isDone',
+						actions: [
+							'$stack.popText',
+						],
+					}],
 					on: {
 						CHARACTER: [
 							{
 								transitionTo: 'tagOpen',
 								condition: 'isTagOpen',
 								actions: [
+									'$maybeStack.pushText',
+									'$maybeStack.addRaw',
 									'$stack.popText',
 									'$stack.pushTag',
 									'$index.increment',
@@ -1122,7 +1222,7 @@ export function parser(source) {
 			isForwardSlash(value) {
 				return value === '/';
 			},
-			isDone(value) {
+			isDone() {
 				// TODO: Listen for a EOF char so that we never need the original source
 				return this.data.index === this.data.source.length;
 			},

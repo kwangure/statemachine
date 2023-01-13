@@ -12,7 +12,7 @@
 
 	$: parserMachine = stateParser($code);
 	$: ({ state, data } = $parserMachine)
-	$: ({ index, source, stack } = data);
+	$: ({ index, maybeStack, source, stack } = data);
 	$: if (index < source.length) {
 		if (index === 0) console.clear();
 		setTimeout(() => {
@@ -21,7 +21,8 @@
 		}, 0);
 	}
 	$: rendered = renderParsing(index);
-	$: [svelteJson, stateMachineJson] = [
+	$: [maybeStackJson, svelteJson, stateMachineJson] = [
+		JSON.stringify(maybeStack, null, 4),
 		JSON.stringify(parse($code), null, 4),
 		JSON.stringify(stack, null, 4),
 	];
@@ -78,10 +79,10 @@
 		</div>
 		{#if showing === 'statemachine'}
 			<h3>State Machine</h3>
-			<Code highlight={json} code={stateMachineJson}/>
+			<Code highlight={json} code={`${stateMachineJson}\n${maybeStackJson}`}/>
 		{:else if showing === 'svelte'}
 			<h3>Svelte</h3>
-			<Code highlight={json} code={svelteJson}/>
+			<Code highlight={json} code={`${svelteJson}`}/>
 		{:else if showing === 'diff'}
 			<h3>Diff</h3>
 			<Diff currentCode={stateMachineJson}

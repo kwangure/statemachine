@@ -1,0 +1,30 @@
+{
+	"start": 0,
+	"end": 18,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 4,
+			"type": "Text",
+			"raw": "< < ",
+			"data": "< < "
+		},
+		{
+			"start": 4,
+			"end": 18,
+			"type": "Element",
+			"name": "p",
+			"attributes": [],
+			"children": [
+				{
+					"start": 7,
+					"end": 14,
+					"type": "Text",
+					"raw": "a < <  ",
+					"data": "a < <  "
+				}
+			]
+		}
+	]
+}
