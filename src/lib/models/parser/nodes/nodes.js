@@ -1,121 +1,200 @@
-/**
- * @typedef {import('./types').Attribute} Attribute
- * @typedef {import('./types').Comment} Comment
- * @typedef {import('./types').Element} Element
- * @typedef {import('./types').Fragment} Fragment
- * @typedef {import('./types').Invalid} Invalid
- * @typedef {import('./types').TemplateNode} TemplateNode
- * @typedef {import('./types').Text} Text
- */
+class PMBaseNode  {
+	/** @type {PMInvalid | undefined} */
+	error;
 
-/**
- * @param {Object} options
- * @param {string} options.name
- * @param {number} options.start
- * @param {number} [options.end]
- * @return {import('type-fest').SetOptional<Attribute, 'end'>}
- */
-export function attribute({ name, start, end }) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		start,
-		end,
-		type: 'Attribute',
-		name,
-		value: /** @type {TemplateNode[]} */([]),
-	};
+	/**
+	 * @param {PMTemplateNode} node
+	 */
+	append(node) {
+		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.type}' as a child.`);
+	}
 }
 
 /**
- * @param {Object} options
- * @param {string} options.name
- * @param {number} options.start
- * @param {number} [options.end]
- * @return {import('type-fest').SetOptional<Element, 'end'>}
+ * @typedef {PMAttribute | PMComment | PMElement | PMFragment | PMInvalid | PMText} PMTemplateNode
  */
-export function element({ name, start, end }) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		start,
-		end,
-		type: 'Element',
-		name,
-		attributes: /** @type {Attribute[]} */([]),
-		children: /** @type {TemplateNode[]} */([]),
-	};
+
+export class PMAttribute extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {string} options.name
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ name, start, end }) {
+		super();
+
+		this.start = start;
+		this.end = end;
+		/** @type {'Attribute'} */
+		this.type = 'Attribute';
+		this.name = name;
+		/** @type {PMTemplateNode[] | true} */
+		this.value = ([]);
+	}
+
+	/**
+	 * @param {PMTemplateNode} node
+	 */
+	append(node) {
+		switch (node.type) {
+			case 'Text':
+				if (Array.isArray(this.value)) {
+					this.value.push(node);
+				} else {
+					this.value = [node];
+				}
+				break;
+			default:
+				super.append(node);
+		}
+	}
 }
 
-/**
- * @param {Object} options
- * @param {string} options.data
- * @param {number} options.start
- * @param {number} [options.end]
- * @return {import('type-fest').SetOptional<Comment, 'end'>}
- */
-export function comment({ data, start, end }) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		start,
-		end,
-		type: 'Comment',
-		data,
-		ignores: /** @type {string[]} */([]),
-	};
+export class PMElement extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {string} options.name
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ name, start, end }) {
+		super();
+		this.start = start;
+		this.end = end;
+		/** @type {'Element'} */
+		this.type = 'Element';
+		this.name = name;
+		this.attributes = /** @type {PMAttribute[]} */([]);
+		this.children = /** @type {PMTemplateNode[]} */([]);
+	}
+
+	/**
+	 * @param {PMTemplateNode} node
+	 */
+	append(node) {
+		switch (node.type) {
+			case 'Attribute':
+				this.attributes.push(node);
+				break;
+			case 'Comment':
+			case 'Element':
+			case 'Invalid':
+				this.children.push(node);
+				break;
+			case 'Text':
+				const lastChild = this.children.at(-1);
+				if (lastChild?.type === 'Text') {
+					lastChild.end = node.end;
+					lastChild.raw += node.raw;
+					lastChild.data = lastChild.raw;
+				} else {
+					this.children.push(node);
+				}
+				break;
+			default:
+				super.append(node);
+		}
+	}
 }
 
-/**
- * @param {number} start
- * @param {number} end
- * @return {Fragment}
- */
-export function fragment(start, end) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		start,
-		end,
-		type: 'Fragment',
-		children: /** @type {TemplateNode[]} */([]),
-	};
+export class PMComment extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {string} options.data
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ data, start, end }) {
+		super();
+		this.data = data;
+		this.start = start;
+		this.end = end;
+		/** @type {'Comment'} */
+		this.type = 'Comment';
+		this.ignores = /** @type {string[]} */([]);
+	}
 }
 
-/**
- * @param {Object} options
- * @param {number} options.start
- * @param {number} [options.end]
- * @param {{ code: string, message: string }} options.error
- * @return {import('type-fest').SetOptional<Invalid, 'end'>}
- */
-export function invalid({ error, start, end }) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		error,
-		start,
-		end,
-		type: 'Invalid',
-	};
+export class PMFragment extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ start, end }) {
+		super();
+		this.start = start;
+		this.end = end;
+		/** @type {'Fragment'} */
+		this.type = 'Fragment';
+		this.children = /** @type {PMTemplateNode[]} */([]);
+	}
+
+	/**
+	 * @param {PMTemplateNode} node
+	 */
+	append(node) {
+		switch (node.type) {
+			case 'Comment':
+			case 'Element':
+				this.children.push(node);
+				break;
+			case 'Text':
+				const lastChild = this.children.at(-1);
+				if (lastChild?.type === 'Text') {
+					lastChild.end = node.end;
+					lastChild.raw += node.raw;
+					lastChild.data = lastChild.raw;
+				} else {
+					this.children.push(node);
+				}
+				break;
+			default:
+				super.append(node);
+		}
+	}
 }
 
-/**
- * @param {Object} options
- * @param {string} options.data
- * @param {string} options.raw
- * @param {number} options.start
- * @param {number} [options.end]
- * @return {import('type-fest').SetOptional<Text, 'end'>}
- */
-export function text({ data, raw, start, end }) {
-	// Sort the object properties in the same order as the Svelte compiler to make
-	// tests and debugging easier
-	return {
-		start,
-		end,
-		type: 'Text',
-		raw,
-		data,
-	};
+export class PMInvalid {
+	/**
+	 * @param {Object} options
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 * @param {{ code: string, message: string }} options.error
+	 */
+	constructor({ error, start, end }) {
+		this.error = error;
+		this.start = start;
+		this.end = end;
+		/** @type {'Invalid'} */
+		this.type = 'Invalid';
+	}
+
+	/**
+	 * @param {{ type: any; }} node
+	 */
+	append(node) {
+		throw Error(`Invalid nodes do not take '${node.type}' as child.`);
+	}
+}
+
+export class PMText extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {string} options.data
+	 * @param {string} options.raw
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ data, raw, start, end }) {
+		super();
+		this.start = start;
+		this.end = end;
+		/** @type {'Text'} */
+		this.type = 'Text';
+		this.raw = raw;
+		this.data = data;
+		this.raw
+	}
 }
