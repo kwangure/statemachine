@@ -239,7 +239,16 @@ export class Machine<
 				const match = dataOpRE.exec(action);
 				if (match) {
 					const [_, value, op] = match;
-					this.#thingOps[value][op].call(this as unknown as This, ...args);
+					try {
+						this.#thingOps[value][op].call(this as unknown as This, ...args);
+					} catch (error) {
+						// @ts-expect-error
+						if (error.message.includes('undefined')) {
+							throw Error(`Attempted to run unknown operation on value. Value: '${value}'; Operation: '${op}'`)
+						} else {
+							throw error;
+						}
+					}
 				} else if (this.#actions && Object.hasOwn(this.#actions, action)) {
 					this.#actions[action].call(this as unknown as This, ...args);
 				} else {
