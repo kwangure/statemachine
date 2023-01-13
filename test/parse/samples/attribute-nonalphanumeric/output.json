@@ -1,0 +1,23 @@
+{
+	"start": 0,
+	"end": 10,
+	"type": "Fragment",
+	"children": [
+		{
+			"start": 0,
+			"end": 10,
+			"type": "Element",
+			"name": "d",
+			"attributes": [
+				{
+					"start": 3,
+					"end": 7,
+					"type": "Attribute",
+					"name": "a'~h",
+					"value": true
+				}
+			],
+			"children": []
+		}
+	]
+}

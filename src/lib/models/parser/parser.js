@@ -661,15 +661,6 @@ export function parser(source) {
 								],
 							},
 							{
-								transitionTo: 'invalid',
-								condition: 'isNonAlphaCharacter',
-								actions: [
-									'$error.invalidTagName',
-									'$stack.pushInvalid',
-									'$index.increment',
-								],
-							},
-							{
 								actions: [
 									'$stack.addName',
 									'$index.increment',
