@@ -33,7 +33,7 @@ describe('parse', () => {
 				for (const char of input) {
 					parser.emit.CHARACTER(char);
 				}
-				const parsed = parser.data.stack[0];
+				const parsed = parser.data.stack.peek();
 				fs.writeFileSync(`${__dirname}/samples/${dir}/_actual.json`, JSON.stringify(parsed, null, '\t'));
 				expect(parsed).toEqual(expectedOutput);
 			} catch (err) {

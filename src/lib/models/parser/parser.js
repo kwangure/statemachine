@@ -1,6 +1,7 @@
 import { attribute, comment, element, fragment, invalid, text } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
 import { isVoidElement } from './utlils';
+import { Stack } from './data';
 
 /**
  * @param {string} char
@@ -24,14 +25,14 @@ function quoteChar(char) {
 export function parser(source) {
 	const index = 0;
 	const html = fragment(index, source.length);
-	const stack = /** @type {TemplateNode[]} */([html]);
+	const stack = /** @type {Stack<TemplateNode>} */(new Stack(html));
 	const parser = new Machine({
 		data: {
 			index,
 			html,
 			source,
 			stack,
-			maybeStack: /** @type {TemplateNode[]} */([]),
+			maybeStack: /** @type {Stack<TemplateNode>} */(new Stack()),
 			openQuote: /** @type {'"' | '\''} */'\'',
 			error: /** @type {{ code: string; message: string } | null} */(null),
 		},
@@ -50,7 +51,7 @@ export function parser(source) {
 					};
 				},
 				invalidVoidContent() {
-					const current = /** @type {Element} */(this.data.stack.at(-1));
+					const current = /** @type {Element} */(this.data.stack.peek());
 
 					return {
 						code: 'invalid-void-content',
@@ -71,7 +72,7 @@ export function parser(source) {
 				},
 				unclosedBlock() {
 					const current = /** @type {Attribute|Comment|Element} */(
-						this.data.stack.at(-1)
+						this.data.stack.peek()
 					);
 					const types = {
 						Attribute: 'tag',
@@ -93,10 +94,8 @@ export function parser(source) {
 			html: {},
 			maybeStack: {
 				addRaw(value) {
-					const current = this.data.maybeStack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the maybeStack.');
-					} else if (!Object.hasOwn(current, 'raw')) {
+					const current = this.data.maybeStack.peek();
+					if (!Object.hasOwn(current, 'raw')) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.raw += value;
@@ -104,20 +103,15 @@ export function parser(source) {
 					return this.data.maybeStack;
 				},
 				pop() {
-					const current = this.data.maybeStack.pop();
-					if (!current) {
-						console.error('Popped from an empty maybeStack.');
-					}
+					this.data.maybeStack.pop();
 					return this.data.maybeStack;
 				},
 				popText() {
 					const current = this.data.maybeStack.pop();
-					if (!current) {
-						console.error('Popped from an empty maybeStack.');
-					} else if (current.type !== 'Text') {
+					if (current.type !== 'Text') {
 						console.error('Popped element is not an text node');
 					} else {
-						const last = this.data.maybeStack.at(-1);
+						const last = this.data.maybeStack.peek();
 						current.end = this.data.index;
 						// TODO: decode html character entities
 						// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
@@ -155,10 +149,8 @@ export function parser(source) {
 			source: {},
 			stack: {
 				addData(value) {
-					const current = this.data.stack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the stack.');
-					} else if (!Object.hasOwn(current, 'data')) {
+					const current = this.data.stack.peek();
+					if (!Object.hasOwn(current, 'data')) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.data += value;
@@ -166,19 +158,13 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				addEnd() {
-					const current = this.data.stack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the stack.');
-					} else {
-						current.end = this.data.index;
-					}
+					const current = this.data.stack.peek();
+					current.end = this.data.index;
 					return this.data.stack;
 				},
 				addName(value) {
-					const current = this.data.stack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the stack.');
-					} else if (!Object.hasOwn(current, 'name')) {
+					const current = this.data.stack.peek();
+					if (!Object.hasOwn(current, 'name')) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.name += value;
@@ -186,10 +172,8 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				addRaw(value) {
-					const current = this.data.stack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the stack.');
-					} else if (!Object.hasOwn(current, 'raw')) {
+					const current = this.data.stack.peek();
+					if (!Object.hasOwn(current, 'raw')) {
 						console.error('Invalid tag name. Adding ', value, 'to', current);
 					} else {
 						current.raw += value;
@@ -197,26 +181,17 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				fromMaybeStack() {
-					const current = this.data.maybeStack.at(-1);
-					if (!current) {
-						console.error('There\'s no item on the stack.');
-					} else {
-						this.data.stack.push(current);
-					}
+					const current = this.data.maybeStack.peek();
+					this.data.stack.push(current);
 					return this.data.stack;
 				},
 				pop() {
-					const current = this.data.stack.pop();
-					if (!current) {
-						console.error('Popped from an empty stack.');
-					}
+					this.data.stack.pop();
 					return this.data.stack;
 				},
 				popAttribute() {
 					const current = this.data.stack.pop();
-					if (!current) {
-						console.error('Popped from an empty stack.');
-					} else if (current.type !== 'Attribute') {
+					if (current.type !== 'Attribute') {
 						console.error('Popped element is not an attribute');
 					} else {
 						if (Array.isArray(current.value) && !current.value.length) {
@@ -225,29 +200,23 @@ export function parser(source) {
 						} else {
 							current.end = this.data.index;
 						}
-						const last = this.data.stack.at(-1);
-						if (!last) {
-							console.error('The last element should not be popped');
+						const last = this.data.stack.peek();
+						if (!last.attributes) {
+							console.error('Last has no attributes')
 						} else {
-							if (!last.attributes) {
-								console.error('Last has no attributes')
-							} else {
-								last.attributes?.push(current);
-							}
+							last.attributes?.push(current);
 						}
 					}
 					return this.data.stack;
 				},
 				popComment() {
-					const current = (this.data.stack.pop());
-					if (!current) {
-						console.error('Popped from an empty stack.');
-					} else if (current.type !== 'Comment') {
+					const current = this.data.stack.pop();
+					if (current.type !== 'Comment') {
 						console.error('Attempted pop non-comment');
 					} else {
 						current.data = current.data.slice(0, -2)
 						current.end = this.data.index;
-						const last = this.data.stack.at(-1);
+						const last = this.data.stack.peek();
 						if (!last) {
 							console.error('The last element should not be popped');
 						} else {
@@ -259,9 +228,7 @@ export function parser(source) {
 				},
 				popElement() {
 					const current = this.data.stack.pop();
-					if (!current) {
-						console.error('Popped from an empty stack.');
-					} else if (current.type !== 'Element') {
+					if (current.type !== 'Element') {
 						console.error('Attempted pop non-element');
 					} else {
 						if (
@@ -277,10 +244,10 @@ export function parser(source) {
 									// TODO: handle autoclosed tags
 									if (parentTag.type !== 'Element') {
 										console.error('Autoclose tags not implemented');
-									// 	const error = parser.last_auto_closed_tag && parser.last_auto_closed_tag.tag === name
-									// 		? parser_errors.invalid_closing_tag_autoclosed(name, parser.last_auto_closed_tag.reason)
-									// 		: parser_errors.invalid_closing_tag_unopened(name);
-									// 	parser.error(error, start);
+										// 	const error = parser.last_auto_closed_tag && parser.last_auto_closed_tag.tag === name
+										// 		? parser_errors.invalid_closing_tag_autoclosed(name, parser.last_auto_closed_tag.reason)
+										// 		: parser_errors.invalid_closing_tag_unopened(name);
+										// 	parser.error(error, start);
 									}
 
 									parentTag.end = current.start;
@@ -297,7 +264,7 @@ export function parser(source) {
 									}
 								}
 								parentTag.end = this.data.index;
-								const last = this.data.stack.at(-1);
+								const last = this.data.stack.peek();
 								if (!last) {
 									console.error('The last element should not be popped');
 								} else {
@@ -307,7 +274,7 @@ export function parser(source) {
 							}
 						} else {
 							current.end = this.data.index;
-							const last = this.data.stack.at(-1);
+							const last = this.data.stack.peek();
 							if (!last) {
 								console.error('The last element should not be popped');
 							} else {
@@ -327,7 +294,7 @@ export function parser(source) {
 						invalid.end = this.data.index;
 						nodeWithError.end = this.data.index;
 						nodeWithError.error = invalid;
-						const parent = this.data.stack.at(-1);
+						const parent = this.data.stack.peek();
 						if (!parent) {
 							console.error('Errored element has no parent');
 						} else {
@@ -358,12 +325,10 @@ export function parser(source) {
 				},
 				popText() {
 					const current = this.data.stack.pop();
-					if (!current) {
-						console.error('Popped from an empty stack.');
-					} else if (current.type !== 'Text') {
+					if (current.type !== 'Text') {
 						console.error('Popped element is not an text node');
 					} else {
-						const last = this.data.stack.at(-1);
+						const last = this.data.stack.peek();
 						current.end = this.data.index;
 						// TODO: decode html character entities
 						// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
@@ -1239,14 +1204,14 @@ export function parser(source) {
 				return value === '>';
 			},
 			isVoidTag(value) {
-				const current = /** @type {Element} */(this.data.stack.at(-1));
+				const current = /** @type {Element} */(this.data.stack.peek());
 				return isVoidElement(current.name + value);
 			},
 			isWhitespace(value) {
 				return /\s/.test(value);
 			},
 			stackNotEmpty() {
-				return this.data.stack.length > 1;
+				return this.data.stack.size > 1;
 			},
 		},
 		actions: {
