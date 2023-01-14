@@ -1,34 +1,50 @@
 /**
- * @template T
- * @type {Stack<T>}
+ * @typedef {import("./nodes/nodes").PMTemplateNode} PMTemplateNode
  */
-export class Stack {
-	/** @type {T[]} */
+
+export class PMStack {
+	/** @type {PMTemplateNode[]} */
 	#value;
 
 	/**
-	 * @param {T[]} values
+	 * @param {PMTemplateNode[]} values
 	 */
 	constructor(...values) {
 		this.#value = [...values];
 	}
 
-	peek() {
+	/**
+	 * @template {PMTemplateNode['type']} T
+	 * @param {{ expect?: T } | undefined} [options]
+	 */
+	peek(options = {}) {
 		if (this.#value.length === 0) {
 			throw Error('Attempted to peek an empty stack');
 		}
-		return /** @type {T} */(this.#value.at(-1));
-	}
-
-	pop() {
-		if (this.#value.length === 0) {
-			throw Error('Attempted to pop an empty stack');
+		const value = /** @type {PMTemplateNode} */(this.#value.at(-1));
+		if (options.expect && value.type !== options.expect) {
+			throw Error(`Expected to peek a '${options.expect}' node, but found a '${value.type}' instead.`);
 		}
-		return /** @type {T} */(this.#value.pop());
+		return /** @type {Extract<PMTemplateNode, { type: T }>} */(value);
 	}
 
 	/**
-	 * @param {T[]} values
+	 * @template {PMTemplateNode['type']} T
+	 * @param {{ expect?: T } | undefined} [options]
+	 */
+	pop(options = {}) {
+		if (this.#value.length === 0) {
+			throw Error('Attempted to pop an empty stack');
+		}
+		const value = /** @type {PMTemplateNode} */(this.#value.pop());
+		if (options.expect && value.type !== options.expect) {
+			throw Error(`Expected to pop a '${options.expect}' node, but found a '${value.type}' instead.`);
+		}
+		return /** @type {Extract<PMTemplateNode, { type: T }>} */(value);
+	}
+
+	/**
+	 * @param {PMTemplateNode[]} values
 	 */
 	push(...values) {
 		return this.#value.push(...values);

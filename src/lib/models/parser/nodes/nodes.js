@@ -32,7 +32,7 @@ class PMBaseNode {
 	set name(_value) {
 		throw PMError(this, 'name');
 	}
-	
+
 	/** @type {void | string} */
 	get raw() {
 		throw PMError(this, 'raw');
@@ -47,6 +47,7 @@ class PMBaseNode {
  */
 
 export class PMAttribute extends PMBaseNode {
+	#name;
 	/**
 	 * @param {Object} options
 	 * @param {string} options.name
@@ -60,7 +61,7 @@ export class PMAttribute extends PMBaseNode {
 		this.end = end;
 		/** @type {'Attribute'} */
 		this.type = 'Attribute';
-		this.name = name;
+		this.#name = name;
 		/** @type {PMTemplateNode[] | true} */
 		this.value = ([]);
 	}
@@ -81,9 +82,29 @@ export class PMAttribute extends PMBaseNode {
 				super.append(node);
 		}
 	}
+
+	/** @type {string} */
+	get name() {
+		return this.#name;
+	}
+	set name(value) {
+		this.#name = value;
+	}
+
+	toJSON() {
+		return {
+			error: this.error,
+			start: this.start,
+			end: this.end,
+			type: this.type,
+			name: this.#name,
+			value: this.value,
+		};
+	}
 }
 
 export class PMElement extends PMBaseNode {
+	#name;
 	/**
 	 * @param {Object} options
 	 * @param {string} options.name
@@ -96,7 +117,7 @@ export class PMElement extends PMBaseNode {
 		this.end = end;
 		/** @type {'Element'} */
 		this.type = 'Element';
-		this.name = name;
+		this.#name = name;
 		this.attributes = /** @type {PMAttribute[]} */([]);
 		this.children = /** @type {PMTemplateNode[]} */([]);
 	}
@@ -128,9 +149,30 @@ export class PMElement extends PMBaseNode {
 				super.append(node);
 		}
 	}
+
+	/** @type {string} */
+	get name() {
+		return this.#name;
+	}
+	set name(value) {
+		this.#name = value;
+	}
+
+	toJSON() {
+		return {
+			error: this.error,
+			start: this.start,
+			end: this.end,
+			type: this.type,
+			name: this.#name,
+			attributes: this.attributes,
+			children: this.children,
+		};
+	}
 }
 
 export class PMComment extends PMBaseNode {
+	#data;
 	/**
 	 * @param {Object} options
 	 * @param {string} options.data
@@ -139,12 +181,31 @@ export class PMComment extends PMBaseNode {
 	 */
 	constructor({ data, start, end }) {
 		super();
-		this.data = data;
+		this.#data = data;
 		this.start = start;
 		this.end = end;
 		/** @type {'Comment'} */
 		this.type = 'Comment';
 		this.ignores = /** @type {string[]} */([]);
+	}
+
+	/** @type {string} */
+	get data() {
+		return this.#data;
+	}
+	set data(value) {
+		this.#data = value;
+	}
+
+	toJSON() {
+		return {
+			error: this.error,
+			start: this.start,
+			end: this.end,
+			type: this.type,
+			data: this.data,
+			ignores: this.ignores,
+		};
 	}
 }
 
@@ -186,6 +247,16 @@ export class PMFragment extends PMBaseNode {
 				super.append(node);
 		}
 	}
+
+	toJSON() {
+		return {
+			error: this.error,
+			start: this.start,
+			end: this.end,
+			type: this.type,
+			children: this.children,
+		};
+	}
 }
 
 export class PMInvalid extends PMBaseNode {
@@ -216,6 +287,8 @@ export class PMInvalid extends PMBaseNode {
 }
 
 export class PMText extends PMBaseNode {
+	#raw;
+	#data;
 	/**
 	 * @param {Object} options
 	 * @param {string} options.data
@@ -229,8 +302,34 @@ export class PMText extends PMBaseNode {
 		this.end = end;
 		/** @type {'Text'} */
 		this.type = 'Text';
-		this.raw = raw;
-		this.data = data;
-		this.raw
+		this.#raw = raw;
+		this.#data = data;
+	}
+
+	/** @type {string} */
+	get data() {
+		return this.#data;
+	}
+	set data(value) {
+		this.#data = value;
+	}
+
+	/** @type {string} */
+	get raw() {
+		return this.#raw;
+	}
+	set raw(value) {
+		this.#raw = value;
+	}
+
+	toJSON() {
+		return {
+			error: this.error,
+			start: this.start,
+			end: this.end,
+			type: this.type,
+			raw: this.raw,
+			data: this.data,
+		};
 	}
 }

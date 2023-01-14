@@ -1,7 +1,7 @@
 import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMText } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
 import { isVoidElement } from './utlils';
-import { Stack } from './data';
+import { PMStack } from './data';
 
 /**
  * @param {string} char
@@ -22,14 +22,14 @@ export function parser(source) {
 		start: index,
 		end: source.length,
 	});
-	const stack = /** @type {Stack<PMTemplateNode>} */(new Stack(html));
+	const stack = /** @type {PMStack} */(new PMStack(html));
 	const parser = new Machine({
 		data: {
 			index,
 			html,
 			source,
 			stack,
-			maybeStack: /** @type {Stack<PMTemplateNode>} */(new Stack()),
+			maybeStack: /** @type {PMStack} */(new PMStack()),
 			openQuote: /** @type {'"' | '\''} */'\'',
 			error: /** @type {{ code: string; message: string } | null} */(null),
 		},
@@ -100,17 +100,14 @@ export function parser(source) {
 					return this.data.maybeStack;
 				},
 				popText() {
-					const current = this.data.maybeStack.pop();
-					if (current.type !== 'Text') {
-						console.error('Popped element is not an text node');
-					} else {
-						const parent = this.data.maybeStack.peek();
-						current.end = this.data.index;
-						// TODO: decode html character entities
-						// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
-						current.data = current.raw;
-						parent.append(current);
-					}
+					const current = this.data.maybeStack.pop({ expect: 'Text' });
+					const parent = this.data.maybeStack.peek();
+					current.end = this.data.index;
+					// TODO: decode html character entities
+					// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+					current.data = current.raw;
+					parent.append(current);
+
 					return this.data.maybeStack;
 				},
 				pushText() {
@@ -160,26 +157,20 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				popAttribute() {
-					const current = this.data.stack.pop();
-					if (current.type !== 'Attribute') {
-						console.error('Popped element is not an attribute');
+					const current = this.data.stack.pop({ expect: 'Attribute' });
+					if (Array.isArray(current.value) && !current.value.length) {
+						current.end = current.start + current.name.length;
+						current.value = true;
 					} else {
-						if (Array.isArray(current.value) && !current.value.length) {
-							current.end = current.start + current.name.length;
-							current.value = true;
-						} else {
-							current.end = this.data.index;
-						}
-						const parent = this.data.stack.peek();
-						parent.append(current);
+						current.end = this.data.index;
 					}
+					const parent = this.data.stack.peek();
+					parent.append(current);
+
 					return this.data.stack;
 				},
 				popComment() {
-					const current = this.data.stack.pop();
-					if (current.type !== 'Comment') {
-						throw Error('Attempted pop non-comment');
-					}
+					const current = this.data.stack.pop({ expect: 'Comment' });
 
 					current.data = current.data.slice(0, -2)
 					current.end = this.data.index;
@@ -190,10 +181,7 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				popElement() {
-					const current = this.data.stack.pop();
-					if (current.type !== 'Element') {
-						throw Error('Attempted pop non-element');
-					}
+					const current = this.data.stack.pop({ expect: 'Element' });
 
 					if (
 						this.transition.from === 'endTagName'
@@ -229,7 +217,7 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				popInvalid() {
-					const invalid = /** @type {PMInvalid} */(this.data.stack.pop());
+					const invalid = this.data.stack.pop({ expect: 'Invalid' });
 					invalid.end = this.data.index;
 
 					const nodeWithError = this.data.stack.pop();
@@ -242,11 +230,7 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				popText() {
-					const current = this.data.stack.pop();
-					if (current.type !== 'Text') {
-						throw Error('Popped element is not an text node');
-					}
-
+					const current = this.data.stack.pop({ expect: 'Text' });
 					const parent = this.data.stack.peek();
 					current.end = this.data.index;
 					// TODO: decode html character entities
@@ -265,16 +249,12 @@ export function parser(source) {
 					return this.data.stack;
 				},
 				pushComment() {
-					const tag = this.data.stack.pop();
-					if (tag.type !== 'Element') {
-						console.error('Attempted to turn non-element to comment');
-					} else {
-						const child = new PMComment({
-							start: tag.start,
-							data: '',
-						});
-						this.data.stack.push(child);
-					}
+					const tag = this.data.stack.pop({ expect: 'Element' });
+					const child = new PMComment({
+						start: tag.start,
+						data: '',
+					});
+					this.data.stack.push(child);
 					return this.data.stack;
 				},
 				pushInvalid(value) {
@@ -1098,7 +1078,7 @@ export function parser(source) {
 				return value === '>';
 			},
 			isVoidTag(value) {
-				const current = /** @type {PMElement} */(this.data.stack.peek());
+				const current = this.data.stack.peek({ expect: 'Element' });
 				return isVoidElement(current.name + value);
 			},
 			isWhitespace(value) {

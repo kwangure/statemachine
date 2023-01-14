@@ -34,8 +34,9 @@ describe('parse', () => {
 					parser.emit.CHARACTER(char);
 				}
 				const parsed = parser.data.stack.peek();
-				fs.writeFileSync(`${__dirname}/samples/${dir}/_actual.json`, JSON.stringify(parsed, null, '\t'));
-				expect(parsed).toEqual(expectedOutput);
+				const stringified = JSON.stringify(parsed, null, '\t');
+				fs.writeFileSync(`${__dirname}/samples/${dir}/_actual.json`, stringified);
+				expect(JSON.parse(stringified)).toEqual(expectedOutput);
 			} catch (err) {
 				if (err.name !== 'ParseError') throw err;
 				if (!expectedError) throw err;
