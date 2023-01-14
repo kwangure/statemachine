@@ -8,7 +8,7 @@
     import { localStorageWritable } from '$lib/stores/localStorageWritable';
 
 	let code = localStorageWritable('code', '');
-	let showing = 'statemachine';
+	let showing = 'sveltish';
 
 	let svelteLike = {};
 	$: parserMachine = stateParser($code);

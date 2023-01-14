@@ -1,4 +1,5 @@
-import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMText } from './nodes/nodes';
+import * as acorn from './acorn.js';
+import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
 import { isVoidElement } from './utlils';
 import { PMStack } from './data';
@@ -1101,6 +1102,9 @@ export function parser(source) {
 	return parser;
 }
 
+const nonNewLineRE = /[^\n]/g;
+const positionIndicatorRE = / \(\d+:\d+\)$/
+
 /**
  * @param {ReturnType<parser>} parser
  */
@@ -1124,28 +1128,149 @@ export function transformToSvelte(parser) {
 		current.end = current.start + current.raw.length;
 	}
 
+	let instance;
+	let module;
+	const nonscripts = [];
+	for (let i = 0; i < children.length; i++) {
+		const node = children[i];
+		if (node.type === 'Element' && node.name === 'script') {
+			const contextIndex = node.attributes
+				.findIndex(attribute => attribute.name === 'context');
+			/** @type {'default' | 'module'} */
+			let context = 'default';
+			if (contextIndex > -1) {
+				const contextAttribute = node.attributes[contextIndex];
+				let error;
+				if (typeof contextAttribute.value === 'boolean') {
+					error = {
+						code: 'invalid-script-context-boolean',
+						message: 'If the context attribute is supplied, its value must be "module"'
+					};
+				} else if (contextAttribute.value.length !== 1 || contextAttribute.value[0].type !== 'Text') {
+					error = {
+						code: 'invalid-script-context-static',
+						message: 'Context attribute must be static',
+					}
+				} else if (contextAttribute.value[0].data !== 'default' && contextAttribute.value[0].data !== 'module') {
+					error = {
+						code: 'invalid-script-context-value',
+						message: 'If the context attribute is supplied, its value must be "module"',
+					}
+				} else {
+					context = contextAttribute.value[0].data;
+				}
+				if (error) {
+					contextAttribute.error = new PMInvalid({
+						start: contextAttribute.start,
+						end: contextAttribute.end,
+						...error,
+					});
+					nonscripts.push(node)
+					continue;
+				}
+			}
+
+			let error;
+			if (context === 'default' && instance) {
+				error = {
+					code: 'invalid-script-instance',
+					message: 'A component can only have one instance-level <script> element',
+				}
+			} else if (context === 'module' && module) {
+				error = {
+					code: 'invalid-script-module',
+					message: 'A component can only have one <script context="module"> element',
+				}
+			}
+
+			if (error) {
+				node.error = new PMInvalid({
+					start: node.start,
+					end: node.end,
+					...error,
+				});
+				nonscripts.push(node);
+				continue;
+			}
+
+			const scriptChild = node.children[0];
+			if (node.children.length > 1 || (node.children.length === 1 && scriptChild.type !== 'Text')) {
+				scriptChild.error = new PMInvalid({
+					start: scriptChild.start,
+					end: scriptChild.end,
+					code: 'invalid-script-nested-elements',
+					message: 'Script elements cannot have nested children',
+				});
+				nonscripts.push(node);
+			} else {
+				const start  = scriptChild
+					? scriptChild.start
+					: parser.data.source.indexOf('</', node.start);
+				const end  = scriptChild
+					? scriptChild.end
+					: start;
+				let ast;
+				try {
+					const code = parser.data.source
+						.slice(0, start)
+						.replace(nonNewLineRE, ' ')
+						+ (scriptChild ? scriptChild.raw : '');
+					ast = /** @type {import('estree').Program} */(acorn.parse(code));
+					/** @type {any} */(ast).start = start;
+					const script = new PMScript({
+						start: node.start,
+						end: node.end,
+						context,
+						content: ast,
+					});
+					if (context === 'default') {
+						instance = script;
+					} else if (context === 'module') {
+						module = script;
+					}
+				} catch (error) {
+					node.error = new PMInvalid({
+						// @ts-ignore
+						start: error.pos,
+						end,
+						code: 'parse-error',
+						message: /** @type {Error} */(error).message.replace(positionIndicatorRE, '')
+					});
+					nonscripts.push(node);
+				}
+			}
+		} else {
+			nonscripts.push(node);
+		}
+	}
+
 	/** @type {number | null} */
 	let start;
 	/** @type {number | null} */
 	let end;
 
-	if (children.length) {
-		start = children[0].start;
+	if (nonscripts.length) {
+		start = nonscripts[0].start;
 		while (/\s/.test(parser.data.source[start])) start += 1;
 
 		// TODO: is optional end on template nodes still necessary?
-		end = /** @type {number} */(/** @type {PMTemplateNode} */(children.at(-1)).end);
+		end = /** @type {number} */(/** @type {PMTemplateNode} */(nonscripts.at(-1)).end);
 		while (/\s/.test(parser.data.source[end - 1])) end -= 1;
 	} else {
 		start = end = null;
 	}
 
-	return {
+	const result = {
 		html: {
 			start,
 			end,
 			type: 'Fragment',
-			children,
+			children: nonscripts,
 		},
+		instance,
+		module,
 	}
+
+
+	return result;
 }

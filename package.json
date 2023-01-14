@@ -13,6 +13,7 @@
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "next",
 		"@sveltejs/kit": "next",
+		"code-red": "^0.2.5",
 		"svelte": "^3.44.0",
 		"svelte-check": "^2.7.1",
 		"type-fest": "^3.5.0",

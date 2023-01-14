@@ -1,0 +1,3 @@
+<script context='test'>
+	console.log('test')
+</script>

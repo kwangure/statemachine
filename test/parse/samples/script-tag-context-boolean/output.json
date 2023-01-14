@@ -1,0 +1,40 @@
+{
+    "html": {
+        "start": 0,
+        "end": 47,
+        "type": "Fragment",
+        "children": [
+            {
+                "start": 0,
+                "end": 47,
+                "type": "Element",
+                "name": "script",
+                "attributes": [
+                    {
+                        "start": 8,
+                        "end": 15,
+                        "type": "Attribute",
+                        "name": "context",
+                        "value": true,
+                        "error": {
+                            "code": "invalid-script-context-boolean",
+                            "message": "If the context attribute is supplied, its value must be \"module\"",
+                            "start": 8,
+                            "end": 15,
+                            "type": "Invalid"
+                        }
+                    }
+                ],
+                "children": [
+                    {
+                        "start": 16,
+                        "end": 38,
+                        "type": "Text",
+                        "raw": "\n\tconsole.log('test')\n",
+                        "data": "\n\tconsole.log('test')\n"
+                    }
+                ]
+            }
+        ]
+    }
+}

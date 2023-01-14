@@ -286,6 +286,25 @@ export class PMInvalid extends PMBaseNode {
 	}
 }
 
+export class PMScript extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {import("estree").Program} options.content
+	 * @param {string} options.context
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ content, context, start, end }) {
+		super();
+		/** @type {'Script'} */
+		this.type = 'Script';
+		this.start = start;
+		this.end = end;
+		this.context = context;
+		this.content = content;
+	}
+}
+
 export class PMText extends PMBaseNode {
 	#raw;
 	#data;

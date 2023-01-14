@@ -1,0 +1,131 @@
+{
+    "html": {
+        "start": null,
+        "end": null,
+        "type": "Fragment",
+        "children": []
+    },
+    "module": {
+        "type": "Script",
+        "start": 0,
+        "end": 58,
+        "context": "module",
+        "content": {
+            "type": "Program",
+            "start": 26,
+            "end": 49,
+            "loc": {
+                "start": {
+                    "line": 1,
+                    "column": 0
+                },
+                "end": {
+                    "line": 3,
+                    "column": 0
+                }
+            },
+            "body": [
+                {
+                    "type": "ExpressionStatement",
+                    "start": 28,
+                    "end": 48,
+                    "loc": {
+                        "start": {
+                            "line": 2,
+                            "column": 1
+                        },
+                        "end": {
+                            "line": 2,
+                            "column": 21
+                        }
+                    },
+                    "expression": {
+                        "type": "CallExpression",
+                        "start": 28,
+                        "end": 47,
+                        "loc": {
+                            "start": {
+                                "line": 2,
+                                "column": 1
+                            },
+                            "end": {
+                                "line": 2,
+                                "column": 20
+                            }
+                        },
+                        "callee": {
+                            "type": "MemberExpression",
+                            "start": 28,
+                            "end": 39,
+                            "loc": {
+                                "start": {
+                                    "line": 2,
+                                    "column": 1
+                                },
+                                "end": {
+                                    "line": 2,
+                                    "column": 12
+                                }
+                            },
+                            "object": {
+                                "type": "Identifier",
+                                "start": 28,
+                                "end": 35,
+                                "loc": {
+                                    "start": {
+                                        "line": 2,
+                                        "column": 1
+                                    },
+                                    "end": {
+                                        "line": 2,
+                                        "column": 8
+                                    }
+                                },
+                                "name": "console"
+                            },
+                            "property": {
+                                "type": "Identifier",
+                                "start": 36,
+                                "end": 39,
+                                "loc": {
+                                    "start": {
+                                        "line": 2,
+                                        "column": 9
+                                    },
+                                    "end": {
+                                        "line": 2,
+                                        "column": 12
+                                    }
+                                },
+                                "name": "log"
+                            },
+                            "computed": false,
+                            "optional": false
+                        },
+                        "arguments": [
+                            {
+                                "type": "Literal",
+                                "start": 40,
+                                "end": 46,
+                                "loc": {
+                                    "start": {
+                                        "line": 2,
+                                        "column": 13
+                                    },
+                                    "end": {
+                                        "line": 2,
+                                        "column": 19
+                                    }
+                                },
+                                "value": "test",
+                                "raw": "'test'"
+                            }
+                        ],
+                        "optional": false
+                    }
+                }
+            ],
+            "sourceType": "module"
+        }
+    }
+}
