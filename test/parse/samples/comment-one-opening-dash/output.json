@@ -4,20 +4,18 @@
 	"type": "Fragment",
 	"children": [
 		{
-			"start": 0,
-			"end": 7,
-			"type": "Comment",
-			"data": "",
-			"ignores": [],
 			"error": {
-				"error": {
-					"code": "incomplete_comment",
-					"message": "Expected a valid comment character but instead found ' '"
-				},
+				"code": "incomplete_comment",
+				"message": "Expected a valid comment character but instead found ' '",
 				"start": 3,
 				"end": 7,
 				"type": "Invalid"
-			}
+			},
+			"data": "",
+			"start": 0,
+			"end": 7,
+			"type": "Comment",
+			"ignores": []
 		},
 		{
 			"start": 7,

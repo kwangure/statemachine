@@ -306,7 +306,7 @@ export function parser(source) {
 					}
 					const child = new PMInvalid({
 						start: this.data.index,
-						error,
+						...error,
 					});
 					this.data.stack.push(child);
 					return this.data.stack;

@@ -1,4 +1,4 @@
-class PMBaseNode  {
+class PMBaseNode {
 	/** @type {PMInvalid | undefined} */
 	error;
 
@@ -156,15 +156,19 @@ export class PMFragment extends PMBaseNode {
 	}
 }
 
-export class PMInvalid {
+export class PMInvalid extends PMBaseNode {
 	/**
 	 * @param {Object} options
+	 * @param {string} options.code
+	 * @param {string} options.message
 	 * @param {number} options.start
 	 * @param {number} [options.end]
-	 * @param {{ code: string, message: string }} options.error
 	 */
-	constructor({ error, start, end }) {
-		this.error = error;
+	constructor({ code, message, start, end }) {
+		super();
+
+		this.code = code;
+		this.message = message;
 		this.start = start;
 		this.end = end;
 		/** @type {'Invalid'} */

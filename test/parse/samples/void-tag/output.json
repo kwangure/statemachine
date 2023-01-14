@@ -4,6 +4,13 @@
 	"type": "Fragment",
 	"children": [
 		{
+			"error": {
+				"code": "unclosed-tag",
+				"message": "Tag was left open",
+				"start": 9,
+				"end": 9,
+				"type": "Invalid"
+			},
 			"start": 0,
 			"end": 9,
 			"type": "Element",
@@ -11,32 +18,21 @@
 			"attributes": [],
 			"children": [
 				{
+					"error": {
+						"code": "invalid-void-content",
+						"message": "<hr> is a void element and cannot have children, or a closing tag",
+						"start": 8,
+						"end": 9,
+						"type": "Invalid"
+					},
 					"start": 4,
 					"end": 9,
 					"type": "Element",
 					"name": "hr",
 					"attributes": [],
-					"children": [],
-					"error": {
-						"error": {
-							"code": "invalid-void-content",
-							"message": "<hr> is a void element and cannot have children, or a closing tag"
-						},
-						"start": 8,
-						"end": 9,
-						"type": "Invalid"
-					}
+					"children": []
 				}
-			],
-			"error": {
-				"error": {
-					"code": "unclosed-tag",
-					"message": "Tag was left open"
-				},
-				"start": 9,
-				"end": 9,
-				"type": "Invalid"
-			}
+			]
 		}
 	]
 }

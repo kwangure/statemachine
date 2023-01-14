@@ -4,38 +4,34 @@
 	"type": "Fragment",
 	"children": [
 		{
+			"error": {
+				"code": "unclosed-tag",
+				"message": "Tag was left open",
+				"start": 15,
+				"end": 15,
+				"type": "Invalid"
+			},
 			"start": 0,
 			"end": 15,
 			"type": "Element",
 			"name": "input",
 			"attributes": [
 				{
+					"error": {
+						"code": "unclosed-tag",
+						"message": "Tag was left open",
+						"start": 15,
+						"end": 15,
+						"type": "Invalid"
+					},
 					"start": 7,
 					"end": 15,
 					"type": "Attribute",
 					"name": "disabled",
-					"value": [],
-					"error": {
-						"error": {
-							"code": "unclosed-tag",
-							"message": "Tag was left open"
-						},
-						"start": 15,
-						"end": 15,
-						"type": "Invalid"
-					}
+					"value": []
 				}
 			],
-			"children": [],
-			"error": {
-				"error": {
-					"code": "unclosed-tag",
-					"message": "Tag was left open"
-				},
-				"start": 15,
-				"end": 15,
-				"type": "Invalid"
-			}
+			"children": []
 		}
 	]
 }
