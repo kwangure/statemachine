@@ -1111,8 +1111,8 @@ const positionIndicatorRE = / \(\d+:\d+\)$/
 export function transformToSvelte(parser) {
 	const fragment = parser.data.stack.peek({ expect: 'Fragment' });
 
-	// Convert to PMNodes to POJO
-	const children = /** @type {PMTemplateNode[]} */(JSON.parse(JSON.stringify(fragment.children)));
+	// Do not modify original stack
+	const children = structuredClone(fragment.children);
 
 	// Remove trailing whitespace text nodes
 	let i = children.length - 1;
