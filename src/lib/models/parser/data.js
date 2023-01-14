@@ -15,15 +15,16 @@ export class PMStack {
 
 	/**
 	 * @template {PMTemplateNode['type']} T
-	 * @param {{ expect?: T } | undefined} [options]
+	 * @param {{ depth?: number, expect?: T } | undefined} [options]
 	 */
-	peek(options = {}) {
+	peek(options) {
+		const { depth = 1, expect } = options || {};
 		if (this.#value.length === 0) {
 			throw Error('Attempted to peek an empty stack');
 		}
-		const value = /** @type {PMTemplateNode} */(this.#value.at(-1));
-		if (options.expect && value.type !== options.expect) {
-			throw Error(`Expected to peek a '${options.expect}' node, but found a '${value.type}' instead.`);
+		const value = /** @type {PMTemplateNode} */(this.#value.at(-1 * depth));
+		if (expect && value.type !== expect) {
+			throw Error(`Expected to peek a '${expect}' node, but found a '${value.type}' instead.`);
 		}
 		return /** @type {Extract<PMTemplateNode, { type: T }>} */(value);
 	}
