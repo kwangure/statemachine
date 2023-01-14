@@ -1,29 +1,31 @@
 {
-	"start": 0,
-	"end": 13,
-	"type": "Fragment",
-	"children": [
-		{
-			"error": {
-				"code": "incomplete_comment",
-				"message": "Expected a valid comment character but instead found ' '",
-				"start": 3,
-				"end": 7,
-				"type": "Invalid"
-			},
-			"data": "",
-			"start": 0,
-			"end": 7,
-			"type": "Comment",
-			"ignores": []
-		},
-		{
-			"start": 7,
-			"end": 13,
-			"type": "Element",
-			"name": "div",
-			"attributes": [],
-			"children": []
-		}
-	]
+    "html": {
+        "start": 0,
+        "end": 13,
+        "type": "Fragment",
+        "children": [
+            {
+                "error": {
+                    "code": "incomplete_comment",
+                    "message": "Expected a valid comment character but instead found ' '",
+                    "start": 3,
+                    "end": 7,
+                    "type": "Invalid"
+                },
+                "start": 0,
+                "end": 7,
+                "type": "Comment",
+                "data": "",
+                "ignores": []
+            },
+            {
+                "start": 7,
+                "end": 13,
+                "type": "Element",
+                "name": "div",
+                "attributes": [],
+                "children": []
+            }
+        ]
+    }
 }

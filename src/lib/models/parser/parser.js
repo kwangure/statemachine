@@ -1100,3 +1100,52 @@ export function parser(source) {
 	});
 	return parser;
 }
+
+/**
+ * @param {ReturnType<parser>} parser
+ */
+export function transformToSvelte(parser) {
+	const fragment = parser.data.stack.peek({ expect: 'Fragment' });
+
+	// Convert to PMNodes to POJO
+	const children = /** @type {PMTemplateNode[]} */(JSON.parse(JSON.stringify(fragment.children)));
+
+	// Remove trailing whitespace text nodes
+	let i = children.length - 1;
+	let current;
+	while ((current = children[i]) && current.type === 'Text' && !current.raw.trim()) {
+		children.pop();
+		i--;
+	}
+
+	if (current?.type === 'Text') {
+		current.raw = current.raw.trim();
+		current.data = current.raw;
+		current.end = current.start + current.raw.length;
+	}
+
+	/** @type {number | null} */
+	let start;
+	/** @type {number | null} */
+	let end;
+
+	if (children.length) {
+		start = children[0].start;
+		while (/\s/.test(parser.data.source[start])) start += 1;
+
+		// TODO: is optional end on template nodes still necessary?
+		end = /** @type {number} */(/** @type {PMTemplateNode} */(children.at(-1)).end);
+		while (/\s/.test(parser.data.source[end - 1])) end -= 1;
+	} else {
+		start = end = null;
+	}
+
+	return {
+		html: {
+			start,
+			end,
+			type: 'Fragment',
+			children,
+		},
+	}
+}

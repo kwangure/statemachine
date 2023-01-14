@@ -1,46 +1,48 @@
 {
-	"start": 0,
-	"end": 23,
-	"type": "Fragment",
-	"children": [
-		{
-			"start": 0,
-			"end": 23,
-			"type": "Element",
-			"name": "div",
-			"attributes": [],
-			"children": [
-				{
-					"start": 5,
-					"end": 7,
-					"type": "Text",
-					"raw": "  ",
-					"data": "  "
-				},
-				{
-					"start": 7,
-					"end": 16,
-					"type": "Element",
-					"name": "p",
-					"attributes": [],
-					"children": [
-						{
-							"start": 10,
-							"end": 12,
-							"type": "Text",
-							"raw": "aa",
-							"data": "aa"
-						}
-					]
-				},
-				{
-					"start": 16,
-					"end": 17,
-					"type": "Text",
-					"raw": " ",
-					"data": " "
-				}
-			]
-		}
-	]
+    "html": {
+        "start": 0,
+        "end": 23,
+        "type": "Fragment",
+        "children": [
+            {
+                "start": 0,
+                "end": 23,
+                "type": "Element",
+                "name": "div",
+                "attributes": [],
+                "children": [
+                    {
+                        "start": 5,
+                        "end": 7,
+                        "type": "Text",
+                        "raw": "  ",
+                        "data": "  "
+                    },
+                    {
+                        "start": 7,
+                        "end": 16,
+                        "type": "Element",
+                        "name": "p",
+                        "attributes": [],
+                        "children": [
+                            {
+                                "start": 10,
+                                "end": 12,
+                                "type": "Text",
+                                "raw": "aa",
+                                "data": "aa"
+                            }
+                        ]
+                    },
+                    {
+                        "start": 16,
+                        "end": 17,
+                        "type": "Text",
+                        "raw": " ",
+                        "data": " "
+                    }
+                ]
+            }
+        ]
+    }
 }

@@ -1,7 +1,7 @@
 <script>
 	import { Code, json } from '@kwangure/strawberry/default/code';
 	import { Container } from '@kwangure/strawberry/default/input/container';
-	import { parser as stateParser } from '$lib/models/parser';
+	import { parser as stateParser, transformToSvelte } from '$lib/models/parser';
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
     import Diff from '$lib/components/diff/diff.svelte';
@@ -10,6 +10,7 @@
 	let code = localStorageWritable('code', '');
 	let showing = 'statemachine';
 
+	let svelteLike = {};
 	$: parserMachine = stateParser($code);
 	$: ({ state, data } = $parserMachine)
 	$: ({ index, maybeStack, source, stack } = data);
@@ -19,10 +20,13 @@
 			console.log({ value: source[index], index, state });
 			parserMachine.emit.CHARACTER(source[index])
 		}, 0);
+	} else {
+		svelteLike = transformToSvelte(parserMachine);
 	}
 	$: rendered = renderParsing(index);
-	$: [maybeStackJson, svelteJson, stateMachineJson] = [
+	$: [maybeStackJson, sveltish, svelteJson, stateMachineJson] = [
 		JSON.stringify(maybeStack, null, 4),
+		JSON.stringify(svelteLike, null, 4),
 		JSON.stringify(parse($code), null, 4),
 		JSON.stringify(stack, null, 4),
 	];
@@ -67,6 +71,9 @@
 	</div>
 	<div class="code">
 		<div class="buttons">
+			<button on:click={() => showing = 'sveltish'}>
+				Sveltish
+			</button>
 			<button on:click={() => showing = 'statemachine'}>
 				State Machine
 			</button>
@@ -77,7 +84,10 @@
 				Diff
 			</button>
 		</div>
-		{#if showing === 'statemachine'}
+		{#if showing === 'sveltish'}
+			<h3>State Machine</h3>
+			<Code highlight={json} code={`${sveltish}`}/>
+		{:else if showing === 'statemachine'}
 			<h3>State Machine</h3>
 			<Code highlight={json} code={`${stateMachineJson}\n${maybeStackJson}`}/>
 		{:else if showing === 'svelte'}
@@ -85,7 +95,7 @@
 			<Code highlight={json} code={`${svelteJson}`}/>
 		{:else if showing === 'diff'}
 			<h3>Diff</h3>
-			<Diff currentCode={stateMachineJson}
+			<Diff currentCode={sveltish}
 				currentCodeHighlight={json}
 				originalCode={svelteJson}
 				originalCodeHighlight={json}/>

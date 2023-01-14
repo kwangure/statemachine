@@ -1,5 +1,5 @@
 import { expect, describe, test } from 'vitest';
-import { parser as createParser } from '../../src/lib/models/parser';
+import { parser as createParser, transformToSvelte } from '../../src/lib/models/parser';
 import fs from 'node:fs';
 import { tryToLoadJson } from './helpers';
 
@@ -33,10 +33,9 @@ describe('parse', () => {
 				for (const char of input) {
 					parser.emit.CHARACTER(char);
 				}
-				const parsed = parser.data.stack.peek();
-				const stringified = JSON.stringify(parsed, null, '\t');
-				fs.writeFileSync(`${__dirname}/samples/${dir}/_actual.json`, stringified);
-				expect(JSON.parse(stringified)).toEqual(expectedOutput);
+				const parsed = transformToSvelte(parser);
+				fs.writeFileSync(`${__dirname}/samples/${dir}/_actual.json`, JSON.stringify(parsed, null, 4));
+				expect(parsed).toEqual(expectedOutput);
 			} catch (err) {
 				if (err.name !== 'ParseError') throw err;
 				if (!expectedError) throw err;

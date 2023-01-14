@@ -1,52 +1,54 @@
 {
-	"start": 0,
-	"end": 10,
-	"type": "Fragment",
-	"children": [
-		{
-			"error": {
-				"code": "unclosed-tag",
-				"message": "Tag was left open",
-				"start": 10,
-				"end": 10,
-				"type": "Invalid"
-			},
-			"start": 0,
-			"end": 10,
-			"type": "Element",
-			"name": "d",
-			"attributes": [
-				{
-					"error": {
-						"code": "unclosed-tag",
-						"message": "Tag was left open",
-						"start": 10,
-						"end": 10,
-						"type": "Invalid"
-					},
-					"start": 3,
-					"end": 10,
-					"type": "Attribute",
-					"name": "d",
-					"value": [
-						{
-							"error": {
-								"code": "invalid_unquoted_value",
-								"message": "'\"' is not permitted in unquoted attribute values",
-								"start": 7,
-								"end": 10,
-								"type": "Invalid"
-							},
-							"start": 5,
-							"end": 10,
-							"type": "Text",
-							"raw": "ab",
-							"data": ""
-						}
-					]
-				}
-			],
-			"children": []
-		}
-	]
+    "html": {
+        "start": 0,
+        "end": 10,
+        "type": "Fragment",
+        "children": [
+            {
+                "error": {
+                    "code": "unclosed-tag",
+                    "message": "Tag was left open",
+                    "start": 10,
+                    "end": 10,
+                    "type": "Invalid"
+                },
+                "start": 0,
+                "end": 10,
+                "type": "Element",
+                "name": "d",
+                "attributes": [
+                    {
+                        "error": {
+                            "code": "unclosed-tag",
+                            "message": "Tag was left open",
+                            "start": 10,
+                            "end": 10,
+                            "type": "Invalid"
+                        },
+                        "start": 3,
+                        "end": 10,
+                        "type": "Attribute",
+                        "name": "d",
+                        "value": [
+                            {
+                                "error": {
+                                    "code": "invalid_unquoted_value",
+                                    "message": "'\"' is not permitted in unquoted attribute values",
+                                    "start": 7,
+                                    "end": 10,
+                                    "type": "Invalid"
+                                },
+                                "start": 5,
+                                "end": 10,
+                                "type": "Text",
+                                "raw": "ab",
+                                "data": ""
+                            }
+                        ]
+                    }
+                ],
+                "children": []
+            }
+        ]
+    }
 }
