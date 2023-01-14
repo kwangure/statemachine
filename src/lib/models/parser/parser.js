@@ -92,11 +92,7 @@ export function parser(source) {
 			maybeStack: {
 				addRaw(value) {
 					const current = this.data.maybeStack.peek();
-					if ('raw' in current) {
-						current.raw += value;
-					} else {
-						console.error('Invalid tag name. Adding ', value, 'to', current);
-					}
+					current.raw += value;
 					return this.data.maybeStack;
 				},
 				pop() {
@@ -136,11 +132,7 @@ export function parser(source) {
 			stack: {
 				addData(value) {
 					const current = this.data.stack.peek();
-					if ('data' in current) {
-						current.data += value;
-					} else {
-						console.error('Invalid tag name. Adding ', value, 'to', current);
-					}
+					current.data += value;
 					return this.data.stack;
 				},
 				addEnd() {
@@ -150,20 +142,12 @@ export function parser(source) {
 				},
 				addName(value) {
 					const current = this.data.stack.peek();
-					if ('name' in current) {
-						current.name += value;
-					} else {
-						console.error('Invalid tag name. Adding ', value, 'to', current);
-					}
+					current.name += value;
 					return this.data.stack;
 				},
 				addRaw(value) {
 					const current = this.data.stack.peek();
-					if ('raw' in current) {
-						current.raw += value;
-					} else {
-						console.error('Invalid tag name. Adding ', value, 'to', current);
-					}
+					current.raw += value;
 					return this.data.stack;
 				},
 				fromMaybeStack() {

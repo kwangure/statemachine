@@ -1,3 +1,11 @@
+/** *
+ * @param {PMBaseNode} node
+ * @param {string} property
+ */
+function PMError(node, property) {
+	return Error(`${node.constructor.name.replace('PM', '')} does not have the ${property} property`);
+}
+
 class PMBaseNode {
 	/** @type {PMInvalid | undefined} */
 	error;
@@ -7,6 +15,30 @@ class PMBaseNode {
 	 */
 	append(node) {
 		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.type}' as a child.`);
+	}
+
+	/** @type {void | string} */
+	get data() {
+		throw PMError(this, 'data');
+	}
+	set data(_value) {
+		throw PMError(this, 'data');
+	}
+
+	/** @type {void | string} */
+	get name() {
+		throw PMError(this, 'name');
+	}
+	set name(_value) {
+		throw PMError(this, 'name');
+	}
+	
+	/** @type {void | string} */
+	get raw() {
+		throw PMError(this, 'raw');
+	}
+	set raw(_value) {
+		throw PMError(this, 'raw');
 	}
 }
 
