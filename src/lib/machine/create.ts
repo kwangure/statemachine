@@ -1,4 +1,4 @@
-import { derived, get, writable, type Readable } from 'svelte/store';
+import { derived, get, writable, type Readable, type Subscriber } from 'svelte/store';
 import type { Config, Handler } from './types';
 import type { UnionToIntersection } from 'type-fest';
 import { thing } from '$lib/thing/thing';
@@ -35,6 +35,8 @@ const STATE = '__$$state';
 const TRANSITION_ACTIVE = '__$$transition_active';
 const TRANSITION_FROM = '__$$transition_from';
 const TRANSITION_TO = '__$$transition_to';
+
+const SUBSCRIBERS = '__$$subscribers';
 
 function isDefined<T>(argument: T | undefined): argument is T {
 	return argument !== undefined
@@ -96,6 +98,7 @@ export class Machine<
 		};
 	}>>
 	#thingOps: any;
+	#subscribers = new Set<Subscriber<this>>();
 
 	emit: This['emit'];
 	__parent: Machine<any, any, any, any, any, any, any> | null = null;
@@ -124,6 +127,9 @@ export class Machine<
 			[TRANSITION_TO]: transitionTo.ops,
 			[TRANSITION_FROM]: transitionFrom.ops,
 			[TRANSITION_ACTIVE]: transitionActive.ops,
+			[SUBSCRIBERS]: {
+				call: this.#callSubscribers,
+			},
 		});
 		const thingNames: string[] = [];
 		const thingStores: Readable<any>[] = [
@@ -202,6 +208,12 @@ export class Machine<
 		return this.#children
 			.update(($children) => [...$children, ...children]);
 	}
+	#callSubscribers() {
+		console.log('calling subscribers', { s: this.#subscribers });
+		for (const subscriber of this.#subscribers) {
+			subscriber(get(this));
+		}
+	}
 	get children(): ReadonlyArray<Machine<any, any, any, any, any, any, any>> {
 		return get(this.#data).children;
 	}
@@ -210,6 +222,8 @@ export class Machine<
 	}
 	destroy() { }
 	#executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
+		const CALL_SUBSCRIBERS_ACTION = { actions: [`$${SUBSCRIBERS}.call` as ActionList] };
+		handlers.push(CALL_SUBSCRIBERS_ACTION);
 		while (handlers.length) {
 			const handler = handlers.shift() as Handler<C, ActionList, keyof Conditions>;
 			if (this.#conditions && handler.condition) {
@@ -231,6 +245,8 @@ export class Machine<
 					...this.#config.states[transitionTo].entry || [],
 					...this.#config.states[transitionTo].always || [],
 					{ actions: [`$${TRANSITION_ACTIVE}.false` as ActionList] },
+					{ actions: [`$${SUBSCRIBERS}.call` as ActionList] },
+					CALL_SUBSCRIBERS_ACTION,
 				].filter(isDefined);
 				continue;
 			}
@@ -274,8 +290,10 @@ export class Machine<
 	get state() {
 		return get(this.#data).state;
 	}
-	get subscribe() {
-		return this.#data.subscribe;
+	subscribe(fn: Subscriber<this>) {
+		this.#subscribers.add(fn)
+		fn(this);
+		return () => this.#subscribers.delete(fn);
 	}
 	get transition() {
 		return get(this.#data).transition;
