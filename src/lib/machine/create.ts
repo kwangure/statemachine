@@ -1,7 +1,7 @@
-import { derived, get, writable, type Readable, type Subscriber } from 'svelte/store';
+import { get, type Subscriber } from 'svelte/store';
 import type { Config, Handler } from './types';
 import type { UnionToIntersection } from 'type-fest';
-import { thing } from '$lib/thing/thing';
+import type { thing } from '$lib/thing/thing';
 
 /**
 	TODO:
@@ -59,19 +59,14 @@ export class Machine<
 	},
 > {
 	#actions: Actions | undefined;
-	#children = writable([] as Machine<any, any, any, any, any, any>[]);
+	#children: Machine<any, any, any, any, any, any>[] = [];
 	#conditions: Conditions | undefined;
 	#config: C;
-	#data: ReturnType<typeof derived<Readable<any>[], {
-		children: Machine<any, any, any, any, any, any>[];
-		data: Data ;
-		state: keyof C["states"];
-		transition: {
-			active: boolean;
-			to: keyof C["states"] | null;
-			from: keyof C["states"] | null;
-		};
-	}>>
+	#state: keyof C["states"];
+	#thingStores: Data;
+	#transitionTo: keyof C["states"] | null = null;
+	#transitionFrom: keyof C["states"] | null = null;
+	#transitionActive: boolean = false;
 	#stores: any;
 	#subscribers = new Set<Subscriber<this>>();
 
@@ -90,57 +85,25 @@ export class Machine<
 		this.#config = options.config;
 
 		const states = (Object.keys(this.#config.states) as (keyof C['states'])[])
-		const stateSetters = states.map((state) => [state, () => state]);
-		const state = thing(options.initial || states[0], Object.fromEntries(stateSetters));
-		const transitionTo = thing(null, Object.fromEntries(stateSetters));
-		const transitionFrom = thing(null, Object.fromEntries(stateSetters));
-		const transitionActive = thing(false, { true: () => true, false: () => false });
-
-		this.#stores = Object.assign({
-			[STATE]: state,
-			[TRANSITION_TO]: transitionTo,
-			[TRANSITION_FROM]: transitionFrom,
-			[TRANSITION_ACTIVE]: transitionActive,
+		this.#state = options.initial || states[0];
+		this.#stores = Object.assign(nullo(), options.data, {
+			[STATE]: Object.fromEntries(states.map((state) => [state, () => {
+				this.#state = state;
+			}])),
+			[TRANSITION_TO]: Object.fromEntries(states.map((state) => [state, () => {
+				this.#transitionTo = state;
+			}])),
+			[TRANSITION_FROM]: Object.fromEntries(states.map((state) => [state, () => {
+				this.#transitionFrom = state;
+			}])),
+			[TRANSITION_ACTIVE]: { true: () => true, false: () => false },
 			[SUBSCRIBERS]: {
 				call: this.#callSubscribers,
 			},
-		}, options.data);
+		});
 
-		const thingNames: string[] = [...Object.keys(options.data)];
-		const thingStores: Readable<any>[] = [
-			state,
-			transitionTo,
-			transitionFrom,
-			transitionActive,
-			this.#children,
-			...Object.values(options.data)
-		];
+		this.#thingStores = options.data;
 
-		this.#data = derived(thingStores,
-			(thingStoreValues) => {
-				let $state: keyof C['states'];
-				let $transitionTo: keyof C['states'] | null;
-				let $transitionFrom: keyof C['states'] | null;
-				let $transitionActive: boolean;
-				let $children: Machine<any, any, any, any, any, any>[];
-				let $things: any[];
-				[$state, $transitionTo, $transitionFrom, $transitionActive, $children, ...$things] = thingStoreValues;
-				const entries = $things.map(($thing, i) => {
-					return [thingNames[i], $thing];
-				});
-				const data: Data = Object.fromEntries(entries);
-
-				return {
-					children: $children,
-					data,
-					state: $state,
-					transition: {
-						active: $transitionActive,
-						to: $transitionTo,
-						from: $transitionFrom,
-					},
-				};
-			});
 		const handlerStateProps = nullo();
 		const handlerMap = nullo();
 		const self = this;
@@ -174,8 +137,7 @@ export class Machine<
 		for (const child of children) {
 			child.__parent = this;
 		}
-		return this.#children
-			.update(($children) => [...$children, ...children]);
+		return this.#children.push(...children);
 	}
 	#callSubscribers() {
 		for (const subscriber of this.#subscribers) {
@@ -183,10 +145,14 @@ export class Machine<
 		}
 	}
 	get children(): ReadonlyArray<Machine<any, any, any, any, any, any>> {
-		return get(this.#data).children;
+		return this.#children;
 	}
 	get data() {
-		return get(this.#data).data;
+		const data = nullo();
+		for (const key in this.#thingStores) {
+			data[key] = get(this.#thingStores[key]);
+		}
+		return data;
 	}
 	destroy() { }
 	#executeHandlers(handlers: Handler<C, ActionList, keyof Conditions>[], ...args: any[]) {
@@ -248,15 +214,14 @@ export class Machine<
 		this.__parent?.removeChild(this);
 	}
 	removeChild(child: Machine<any, any, any, any, any, any>) {
-		this.#children
-			.update(($children) => $children.filter(($child) => {
-				const found = $child === child;
-				if (found) child.__parent = null;
-				return !found;
-			}));
+		this.#children = this.#children.filter(($child) => {
+			const found = $child === child;
+			if (found) child.__parent = null;
+			return !found;
+		});
 	}
 	get state() {
-		return get(this.#data).state;
+		return this.#state;
 	}
 	subscribe(fn: Subscriber<this>) {
 		this.#subscribers.add(fn)
@@ -264,7 +229,11 @@ export class Machine<
 		return () => this.#subscribers.delete(fn);
 	}
 	get transition() {
-		return get(this.#data).transition;
+		return {
+			active: this.#transitionActive,
+			to: this.#transitionTo,
+			from: this.#transitionFrom,
+		};
 	}
 }
 
