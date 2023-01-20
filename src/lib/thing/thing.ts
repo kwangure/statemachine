@@ -20,7 +20,27 @@ export function thing<T, S extends Ops<T>>(value: T, ops?: S) {
 	}
 
 	return {
-		ops: storeOps,
-		store: { subscribe },
+		...storeOps,
+		subscribe,
+	};
+}
+
+export function thing2<T, S extends Ops<T>>(value: T, ops?: S) {
+	const store = writable(value);
+	const { subscribe, update } = store;
+
+	const storeOps: {
+		[K in keyof S]: () => void;
+	} = Object.create(null);
+
+	for (const name in ops) {
+		storeOps[name] = function (...args) {
+			update(() => ops[name].call(this, ...args))
+		};
+	}
+
+	return {
+		...storeOps,
+		subscribe,
 	};
 }

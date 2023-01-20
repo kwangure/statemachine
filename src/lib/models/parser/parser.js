@@ -1,8 +1,10 @@
+// @ts-nocheck
 import * as acorn from './acorn.js';
 import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes';
 import { Machine } from '$lib/machine/create';
 import { isVoidElement } from './utlils';
 import { PMStack } from './data';
+import { thing } from '$lib/thing/thing';
 
 /**
  * @param {string} char
@@ -26,108 +28,14 @@ export function parser(source) {
 	const stack = /** @type {PMStack} */(new PMStack(html));
 	const parser = new Machine({
 		data: {
-			index,
-			html,
-			source,
-			stack,
-			maybeStack: /** @type {PMStack} */(new PMStack()),
-			openQuote: /** @type {'"' | '\''} */'\'',
-			error: /** @type {{ code: string; message: string } | null} */(null),
-		},
-		ops: {
-			error: {
-				incompleteComment(value) {
-					return {
-						code: 'incomplete_comment',
-						message: `Expected a valid comment character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidTagName(value) {
-					return {
-						code: 'invalid_tag_name',
-						message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidVoidContent() {
-					const current = /** @type {PMElement} */(this.data.stack.peek());
-
-					return {
-						code: 'invalid-void-content',
-						message: `<${current.name}> is a void element and cannot have children, or a closing tag`
-					};
-				},
-				invalidAttributeName(value) {
-					return {
-						code: 'invalid_attribute_name',
-						message: `Expected a valid attribute character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidUnquotedValue(value) {
-					return {
-						code: 'invalid_unquoted_value',
-						message: `${quoteChar(value)} is not permitted in unquoted attribute values`
-					}
-				},
-				unclosedBlock() {
-					const current = /** @type {PMAttribute | PMComment | PMElement} */(
-						this.data.stack.peek()
-					);
-					const types = {
-						Attribute: 'tag',
-						Comment: 'comment',
-						Element: `tag`,
-					};
-					const type = types[current.type] || 'block';
-					return {
-						code: `unclosed-${type}`,
-						message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
-					};
-				},
-			},
-			index: {
+			index: thing(index, {
 				increment() {
 					return this.data.index + 1;
 				},
-			},
-			html: {},
-			maybeStack: {
-				addRaw(value) {
-					const current = this.data.maybeStack.peek();
-					current.raw += value;
-					return this.data.maybeStack;
-				},
-				pop() {
-					this.data.maybeStack.pop();
-					return this.data.maybeStack;
-				},
-				popText() {
-					const current = this.data.maybeStack.pop({ expect: 'Text' });
-					const parent = this.data.maybeStack.peek();
-					current.end = this.data.index;
-					// TODO: decode html character entities
-					// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
-					current.data = current.raw;
-					parent.append(current);
-
-					return this.data.maybeStack;
-				},
-				pushText() {
-					const child = new PMText({
-						start: this.data.index,
-						data: '',
-						raw: '',
-					});
-					this.data.maybeStack.push(child);
-					return this.data.maybeStack;
-				},
-			},
-			openQuote: {
-				set(value) {
-					return value;
-				},
-			},
-			source: {},
-			stack: {
+			}),
+			html: thing(html, {}),
+			source: thing(source, {}),
+			stack: thing(stack, {
 				addData(value) {
 					const current = this.data.stack.peek();
 					current.data += value;
@@ -293,7 +201,92 @@ export function parser(source) {
 					this.data.stack.push(child);
 					return this.data.stack;
 				},
-			},
+			}),
+			maybeStack: thing(/** @type {PMStack} */(new PMStack()), {
+				addRaw(value) {
+					const current = this.data.maybeStack.peek();
+					current.raw += value;
+					return this.data.maybeStack;
+				},
+				pop() {
+					this.data.maybeStack.pop();
+					return this.data.maybeStack;
+				},
+				popText() {
+					const current = this.data.maybeStack.pop({ expect: 'Text' });
+					const parent = this.data.maybeStack.peek();
+					current.end = this.data.index;
+					// TODO: decode html character entities
+					// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+					current.data = current.raw;
+					parent.append(current);
+
+					return this.data.maybeStack;
+				},
+				pushText() {
+					const child = new PMText({
+						start: this.data.index,
+						data: '',
+						raw: '',
+					});
+					this.data.maybeStack.push(child);
+					return this.data.maybeStack;
+				},
+			}),
+			openQuote: thing(/** @type {'"' | '\''} */'\'', {
+				set(value) {
+					return value;
+				},
+			}),
+			error: thing(/** @type {{ code: string; message: string } | null} */(null), {
+				incompleteComment(value) {
+					return {
+						code: 'incomplete_comment',
+						message: `Expected a valid comment character but instead found ${quoteChar(value)}`,
+					};
+				},
+				invalidTagName(value) {
+					return {
+						code: 'invalid_tag_name',
+						message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
+					};
+				},
+				invalidVoidContent() {
+					const current = /** @type {PMElement} */(this.data.stack.peek());
+
+					return {
+						code: 'invalid-void-content',
+						message: `<${current.name}> is a void element and cannot have children, or a closing tag`
+					};
+				},
+				invalidAttributeName(value) {
+					return {
+						code: 'invalid_attribute_name',
+						message: `Expected a valid attribute character but instead found ${quoteChar(value)}`,
+					};
+				},
+				invalidUnquotedValue(value) {
+					return {
+						code: 'invalid_unquoted_value',
+						message: `${quoteChar(value)} is not permitted in unquoted attribute values`
+					}
+				},
+				unclosedBlock() {
+					const current = /** @type {PMAttribute | PMComment | PMElement} */(
+						this.data.stack.peek()
+					);
+					const types = {
+						Attribute: 'tag',
+						Comment: 'comment',
+						Element: `tag`,
+					};
+					const type = types[current.type] || 'block';
+					return {
+						code: `unclosed-${type}`,
+						message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
+					};
+				},
+			}),
 		},
 		config: {
 			states: {

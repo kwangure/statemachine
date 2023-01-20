@@ -11,26 +11,6 @@ import { thing } from '$lib/thing/thing';
 
 const dataOpRE = /^\$([_$\w]+)\.(\w+)$/;
 
-/**
- *
- * ```javascript
- * type Ops = {
- * 		completed: {
- * 			toggle: (value: boolean) => boolean;
- * 		};
- * 		count: {
- * 			increment: (value: number) => number;
- * 		};
- * 	}
- *  Depth2Path<Ops, keyof Ops> === "$completed.toggle" | "$count.increment"`
- * ```
- */
-type Depth2Path<T, U extends keyof T> = U extends string | number
-	? keyof T[U] extends string | number
-		? `$${U}.${keyof T[U]}`
-		: never
-	: never;
-
 const STATE = '__$$state';
 const TRANSITION_ACTIVE = '__$$transition_active';
 const TRANSITION_FROM = '__$$transition_from';
@@ -45,15 +25,15 @@ function isDefined<T>(argument: T | undefined): argument is T {
 const nullo = () => Object.create(null);
 
 export class Machine<
-	ActionList extends Depth2Path<Ops, keyof Ops> | keyof Actions,
+	ActionList extends keyof Actions,
 	C extends Config<C, ActionList, keyof Conditions>,
-	Data extends { [key: string]: any },
+	Data extends { [key: string]: ReturnType<typeof thing> },
 	// Unfortunately we have to manually type `this` for non-static member
 	// of the class. I don't think there's a way to pass it automatically?
 	This extends {
-		append: (...children: Machine<any, any, any, any, any, any, any>[]) => void;
-		children: ReadonlyArray<Machine<any, any, any, any, any, any, any>>;
-		parent: Readonly<Machine<any, any, any, any, any, any, any>>;
+		append: (...children: Machine<any, any, any, any, any, any>[]) => void;
+		children: ReadonlyArray<Machine<any, any, any, any, any, any>>;
+		parent: Readonly<Machine<any, any, any, any, any, any>>;
 		data: { [key in keyof Data]: Data[key] };
 		emit: {
 			[
@@ -62,7 +42,7 @@ export class Machine<
 				>
 			]: (...args: any) => any
 		},
-		removeChild<T>(child: T extends Machine<any, any, any, any, any, any, any> ? T : never): T;
+		removeChild<T>(child: T extends Machine<any, any, any, any, any, any> ? T : never): T;
 		remove: () => void;
 		state: keyof C['states'],
 		transition: {
@@ -77,18 +57,13 @@ export class Machine<
 	Conditions extends {
 		[x: string]: (this: This, ...args: any) => boolean;
 	},
-	Ops extends {
-		[k in keyof Data]: {
-			[x: string]: (this: This, ...args: any) => Data[k]
-		}
-	},
 > {
 	#actions: Actions | undefined;
-	#children = writable([] as Machine<any, any, any, any, any, any, any>[]);
+	#children = writable([] as Machine<any, any, any, any, any, any>[]);
 	#conditions: Conditions | undefined;
 	#config: C;
 	#data: ReturnType<typeof derived<Readable<any>[], {
-		children: Machine<any, any, any, any, any, any, any>[];
+		children: Machine<any, any, any, any, any, any>[];
 		data: Data ;
 		state: keyof C["states"];
 		transition: {
@@ -97,19 +72,18 @@ export class Machine<
 			from: keyof C["states"] | null;
 		};
 	}>>
-	#thingOps: any;
+	#stores: any;
 	#subscribers = new Set<Subscriber<this>>();
 
 	emit: This['emit'];
-	__parent: Machine<any, any, any, any, any, any, any> | null = null;
+	__parent: Machine<any, any, any, any, any, any> | null = null;
 
 	constructor(options: {
 		actions?: Actions,
-		data?: Data,
+		data: Data,
 		conditions?: Conditions,
 		config: C,
 		initial?: keyof C['states'],
-		ops?: Ops,
 	}) {
 		this.#actions = options.actions;
 		this.#conditions = options.conditions;
@@ -122,22 +96,24 @@ export class Machine<
 		const transitionFrom = thing(null, Object.fromEntries(stateSetters));
 		const transitionActive = thing(false, { true: () => true, false: () => false });
 
-		this.#thingOps = Object.create({
-			[STATE]: state.ops,
-			[TRANSITION_TO]: transitionTo.ops,
-			[TRANSITION_FROM]: transitionFrom.ops,
-			[TRANSITION_ACTIVE]: transitionActive.ops,
+		this.#stores = Object.assign({
+			[STATE]: state,
+			[TRANSITION_TO]: transitionTo,
+			[TRANSITION_FROM]: transitionFrom,
+			[TRANSITION_ACTIVE]: transitionActive,
 			[SUBSCRIBERS]: {
 				call: this.#callSubscribers,
 			},
-		});
-		const thingNames: string[] = [];
+		}, options.data);
+
+		const thingNames: string[] = [...Object.keys(options.data)];
 		const thingStores: Readable<any>[] = [
-			state.store,
-			transitionTo.store,
-			transitionFrom.store,
-			transitionActive.store,
+			state,
+			transitionTo,
+			transitionFrom,
+			transitionActive,
 			this.#children,
+			...Object.values(options.data)
 		];
 
 		this.#data = derived(thingStores,
@@ -146,7 +122,7 @@ export class Machine<
 				let $transitionTo: keyof C['states'] | null;
 				let $transitionFrom: keyof C['states'] | null;
 				let $transitionActive: boolean;
-				let $children: Machine<any, any, any, any, any, any, any>[];
+				let $children: Machine<any, any, any, any, any, any>[];
 				let $things: any[];
 				[$state, $transitionTo, $transitionFrom, $transitionActive, $children, ...$things] = thingStoreValues;
 				const entries = $things.map(($thing, i) => {
@@ -165,13 +141,6 @@ export class Machine<
 					},
 				};
 			});
-		const ops = options.ops || nullo();
-		for (const [key, value] of Object.entries(options.data || nullo())) {
-			const { ops: ops2, store } = thing(value, ops[key]);
-			this.#thingOps[key] = ops2;
-			thingNames.push(key);
-			thingStores.push(store);
-		}
 		const handlerStateProps = nullo();
 		const handlerMap = nullo();
 		const self = this;
@@ -201,7 +170,7 @@ export class Machine<
 		this.emit = handlerMap;
 		this.#executeHandlers(this.#config.states[this.state].entry || [])
 	}
-	append(...children: Machine<any, any, any, any, any, any, any>[]) {
+	append(...children: Machine<any, any, any, any, any, any>[]) {
 		for (const child of children) {
 			child.__parent = this;
 		}
@@ -209,12 +178,11 @@ export class Machine<
 			.update(($children) => [...$children, ...children]);
 	}
 	#callSubscribers() {
-		console.log('calling subscribers', { s: this.#subscribers });
 		for (const subscriber of this.#subscribers) {
 			subscriber(get(this));
 		}
 	}
-	get children(): ReadonlyArray<Machine<any, any, any, any, any, any, any>> {
+	get children(): ReadonlyArray<Machine<any, any, any, any, any, any>> {
 		return get(this.#data).children;
 	}
 	get data() {
@@ -256,7 +224,7 @@ export class Machine<
 				if (match) {
 					const [_, value, op] = match;
 					try {
-						this.#thingOps[value][op].call(this as unknown as This, ...args);
+						this.#stores[value][op].call(this as unknown as This, ...args);
 					} catch (error) {
 						// @ts-expect-error
 						if (error.message.includes('undefined')) {
@@ -273,13 +241,13 @@ export class Machine<
 			}
 		}
 	}
-	get parent(): Readonly<Machine<any, any, any, any, any, any, any>> | null {
+	get parent(): Readonly<Machine<any, any, any, any, any, any>> | null {
 		return this.__parent;
 	}
 	remove() {
 		this.__parent?.removeChild(this);
 	}
-	removeChild(child: Machine<any, any, any, any, any, any, any>) {
+	removeChild(child: Machine<any, any, any, any, any, any>) {
 		this.#children
 			.update(($children) => $children.filter(($child) => {
 				const found = $child === child;
