@@ -1,44 +1,122 @@
+import { ESArray, ESBoolean, ESMap, ESNumber, ESString } from "eventscript/nodes";
+
 /** *
- * @param {PMBaseNode} node
+ * @param {PMBaseNode<string>} node
  * @param {string} property
  */
 function PMError(node, property) {
 	return Error(`${node.constructor.name.replace('PM', '')} does not have the ${property} property`);
 }
 
-class PMBaseNode {
-	/** @type {PMInvalid | undefined} */
-	error;
+/**
+ * @template {string} T
+ * @extends {ESMap<string, PMBaseNode<any>>}
+ */
+class PMBaseNode extends ESMap {
+	/**
+	 * @param {any} value
+	 */
+	constructor(value) {
+		super(value);
+	}
 
 	/**
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.type}' as a child.`);
+		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.get('type')}' as a child.`);
+	}
+
+	/** @type {number | ESNumber} */
+	get end() {
+		const value = this.get('end');
+		if (!value) throw PMError(this, 'end');
+		return Number(value);
+	}
+	set end(end) {
+		const value = this.get('end');
+		if (!value) throw PMError(this, 'end');
+		value.set(end);
+	}
+
+	/** @param {PMInvalid} value */
+	set error(value) {
+		this.set('error', value);
 	}
 
 	/** @type {string} */
 	get data() {
-		throw PMError(this, 'data');
+		const value = this.get('data');
+		if (!value) throw PMError(this, 'data');
+		return String(value);
 	}
-	set data(_value) {
-		throw PMError(this, 'data');
+	set data(data) {
+		const value = this.get('data');
+		if (!value) throw PMError(this, 'data');
+		value.set(data);
 	}
 
 	/** @type {string} */
 	get name() {
-		throw PMError(this, 'name');
+		const value = this.get('name');
+		if (!value) throw PMError(this, 'name');
+		return String(value);
 	}
-	set name(_value) {
-		throw PMError(this, 'name');
+	set name(name) {
+		const value = this.get('name');
+		if (!value) throw PMError(this, 'name');
+		value.set(name);
 	}
 
 	/** @type {string} */
 	get raw() {
-		throw PMError(this, 'raw');
+		const value = this.get('raw');
+		if (!value) throw PMError(this, 'raw');
+		return String(value);
 	}
-	set raw(_value) {
-		throw PMError(this, 'raw');
+	set raw(raw) {
+		const value = this.get('raw');
+		if (!value) throw PMError(this, 'raw');
+		value.set(raw);
+	}
+
+	/** @type {number} */
+	get start() {
+		const value = this.get('start');
+		if (!value) throw PMError(this, 'start');
+		return Number(value);
+	}
+	set start(start) {
+		const value = this.get('start');
+		if (!value) throw PMError(this, 'start');
+		value.set(start);
+	}
+
+	/** @type {T} */
+	get type() {
+		const value = this.get('type');
+		if (!value) throw PMError(this, 'type');
+		return /** @type {T} */(String(value));
+	}
+
+	/** @type {boolean | any[]} */
+	get value() {
+		const value = this.get('value');
+		if (!value) throw PMError(this, 'value');
+		if (value instanceof Boolean) {
+			return Boolean(value);
+		}
+		return [...value];
+	}
+	set value(_value) {
+		const value = this.get('value');
+		if (!value) throw PMError(this, 'value');
+		// TODO: Preserve subscribers? Cast? 🤔
+		if (typeof _value === 'boolean') {
+			this.set('value', new ESBoolean(_value));
+		} else {
+			this.set('value', new ESArray(_value));
+		}
 	}
 }
 
@@ -46,6 +124,7 @@ class PMBaseNode {
  * @typedef {PMAttribute | PMComment | PMElement | PMFragment | PMInvalid | PMText} PMTemplateNode
  */
 
+/** @extends {PMBaseNode<'Attribute'>} */
 export class PMAttribute extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -54,29 +133,25 @@ export class PMAttribute extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ name, start, end }) {
-		super();
-
-		this.start = start;
-		this.end = end;
-		/** @type {'Attribute'} */
-		this.type = 'Attribute';
-		Object.defineProperties(this, {
-			name: { value: name, enumerable: true, writable: true },
-		});
-		/** @type {PMTemplateNode[] | true} */
-		this.value = ([]);
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Attribute')],
+			['name', new ESString(name)],
+			['value', new ESArray()],
+		]);
 	}
 
 	/**
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (node.type) {
+		switch (String(node.get('type'))) {
 			case 'Text':
-				if (Array.isArray(this.value)) {
-					this.value.push(node);
+				if (this.get('value') instanceof ESArray) {
+					this.get('value').push(node);
 				} else {
-					this.value = [node];
+					this.set('value', new ESArray([node]));
 				}
 				break;
 			default:
@@ -85,6 +160,7 @@ export class PMAttribute extends PMBaseNode {
 	}
 }
 
+/** @extends {PMBaseNode<'Element'>} */
 export class PMElement extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -93,39 +169,37 @@ export class PMElement extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ name, start, end }) {
-		super();
-		this.start = start;
-		this.end = end;
-		/** @type {'Element'} */
-		this.type = 'Element';
-		Object.defineProperties(this, {
-			name: { value: name, enumerable: true, writable: true },
-		});
-		this.attributes = /** @type {PMAttribute[]} */([]);
-		this.children = /** @type {PMTemplateNode[]} */([]);
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Element')],
+			['name', new ESString(name)],
+			['attributes', new ESArray()],
+			['children', new ESArray()],
+		]);
 	}
 
 	/**
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (node.type) {
+		switch (String(node.get('type'))) {
 			case 'Attribute':
-				this.attributes.push(node);
+				this.get('attributes').push(node);
 				break;
 			case 'Comment':
 			case 'Element':
 			case 'Invalid':
-				this.children.push(node);
+				this.get('children').push(node);
 				break;
 			case 'Text':
-				const lastChild = this.children.at(-1);
-				if (lastChild?.type === 'Text') {
+				const lastChild = this.get('children').at(-1);
+				if (String(lastChild?.get('type')) === 'Text') {
 					lastChild.end = node.end;
 					lastChild.raw += node.raw;
 					lastChild.data = lastChild.raw;
 				} else {
-					this.children.push(node);
+					this.get('children').push(node);
 				}
 				break;
 			default:
@@ -134,6 +208,7 @@ export class PMElement extends PMBaseNode {
 	}
 }
 
+/** @extends {PMBaseNode<'Comment'>} */
 export class PMComment extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -142,18 +217,17 @@ export class PMComment extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ data, start, end }) {
-		super();
-		this.start = start;
-		this.end = end;
-		/** @type {'Comment'} */
-		this.type = 'Comment';
-		Object.defineProperties(this, {
-			data: { value: data, enumerable: true, writable: true },
-		});
-		this.ignores = /** @type {string[]} */([]);
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Comment')],
+			['data', new ESString(data)],
+			['ignores', new ESArray()],
+		]);
 	}
 }
 
+/** @extends {PMBaseNode<'Fragment'>} */
 export class PMFragment extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -161,31 +235,31 @@ export class PMFragment extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ start, end }) {
-		super();
-		this.start = start;
-		this.end = end;
-		/** @type {'Fragment'} */
-		this.type = 'Fragment';
-		this.children = /** @type {PMTemplateNode[]} */([]);
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Fragment')],
+			['children', new ESArray()],
+		]);
 	}
 
 	/**
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (node.type) {
+		switch (String(node.get('type'))) {
 			case 'Comment':
 			case 'Element':
-				this.children.push(node);
+				this.get('children').push(node);
 				break;
 			case 'Text':
-				const lastChild = this.children.at(-1);
-				if (lastChild?.type === 'Text') {
+				const lastChild = this.get('children').at(-1);
+				if (String(lastChild?.get('type')) === 'Text') {
 					lastChild.end = node.end;
 					lastChild.raw += node.raw;
 					lastChild.data = lastChild.raw;
 				} else {
-					this.children.push(node);
+					this.get('children').push(node);
 				}
 				break;
 			default:
@@ -194,6 +268,7 @@ export class PMFragment extends PMBaseNode {
 	}
 }
 
+/** @extends {PMBaseNode<'Invalid'>} */
 export class PMInvalid extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -203,24 +278,24 @@ export class PMInvalid extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ code, message, start, end }) {
-		super();
-
-		this.code = code;
-		this.message = message;
-		this.start = start;
-		this.end = end;
-		/** @type {'Invalid'} */
-		this.type = 'Invalid';
+		super([
+			['code', new ESString(code)],
+			['message', new ESString(message)],
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Invalid')],
+		]);
 	}
 
 	/**
-	 * @param {{ type: any; }} node
+	 * @param {any} node
 	 */
 	append(node) {
-		throw Error(`Invalid nodes do not take '${node.type}' as child.`);
+		throw Error(`Invalid nodes do not take '${node.get('type')}' as child.`);
 	}
 }
 
+/** @extends {PMBaseNode<'Script'>} */
 export class PMScript extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -230,16 +305,17 @@ export class PMScript extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ content, context, start, end }) {
-		super();
-		/** @type {'Script'} */
-		this.type = 'Script';
-		this.start = start;
-		this.end = end;
-		this.context = context;
-		this.content = content;
+		super([
+			['type', new ESString('Script')],
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['context', new ESString(context)],
+			['content', new ESString(content)],
+		]);
 	}
 }
 
+/** @extends {PMBaseNode<'Text'>} */
 export class PMText extends PMBaseNode {
 	/**
 	 * @param {Object} options
@@ -249,14 +325,12 @@ export class PMText extends PMBaseNode {
 	 * @param {number} [options.end]
 	 */
 	constructor({ data, raw, start, end }) {
-		super();
-		this.start = start;
-		this.end = end;
-		/** @type {'Text'} */
-		this.type = 'Text';
-		Object.defineProperties(this, {
-			raw: { value: raw, enumerable: true, writable: true },
-			data: { value: data, enumerable: true, writable: true },
-		});
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end)],
+			['type', new ESString('Text')],
+			['raw', new ESString(raw)],
+			['data', new ESString(data)]
+		]);
 	}
 }

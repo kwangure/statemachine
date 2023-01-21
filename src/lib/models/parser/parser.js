@@ -1,10 +1,9 @@
-// @ts-nocheck
 import * as acorn from './acorn.js';
-import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes';
-import { Machine } from '$lib/machine/create';
-import { isVoidElement } from './utlils';
-import { PMStack } from './data';
-import { thing } from '$lib/thing/thing';
+import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes.js';
+import { ESArray, ESNumber } from "eventscript/nodes";
+import { Machine } from '$lib/machine/create.js'
+import { isVoidElement } from './utlils.js';
+import { PMStack } from './data.js';
 
 /**
  * @param {string} char
@@ -14,279 +13,259 @@ function quoteChar(char) {
 }
 
 /**
- * @typedef {import('./nodes/nodes').PMTemplateNode} PMTemplateNode
+ * @typedef {import('./nodes/nodes.js').PMTemplateNode} PMTemplateNode
  */
 /**
  * @param {string} source
  */
 export function parser(source) {
-	const index = 0;
-	const html = new PMFragment({
-		start: index,
+	let index = new ESNumber(0);
+	let html = new PMFragment({
+		start: Number(index),
 		end: source.length,
 	});
-	const stack = /** @type {PMStack} */(new PMStack(html));
+	let stack = new PMStack(html);
+	let maybeStack = new PMStack();
+	let openQuote = /** @type {'"' | '\''} */'\'';
+	let error = /** @type {{ code: string; message: string } | null} */(null);
 	const parser = new Machine({
-		data: {
-			index: thing(index, {
-				increment() {
-					return this.data.index + 1;
-				},
-			}),
-			html: thing(html, {}),
-			source: thing(source, {}),
-			stack: thing(stack, {
-				addData(value) {
-					const current = this.data.stack.peek();
-					current.data += value;
-					return this.data.stack;
-				},
-				addEnd() {
-					const current = this.data.stack.peek();
-					current.end = this.data.index;
-					return this.data.stack;
-				},
-				addName(value) {
-					const current = this.data.stack.peek();
-					current.name += value;
-					return this.data.stack;
-				},
-				addRaw(value) {
-					const current = this.data.stack.peek();
-					current.raw += value;
-					return this.data.stack;
-				},
-				fromMaybeStack() {
-					const current = this.data.maybeStack.peek();
-					this.data.stack.push(current);
-					return this.data.stack;
-				},
-				pop() {
-					this.data.stack.pop();
-					return this.data.stack;
-				},
-				popAttribute() {
-					const current = this.data.stack.pop({ expect: 'Attribute' });
-					if (Array.isArray(current.value) && !current.value.length) {
-						current.end = current.start + current.name.length;
-						current.value = true;
-					} else {
-						current.end = this.data.index;
+		data() {
+			return {
+				error,
+				index: Number(index),
+				html,
+				maybeStack,
+				source,
+				stack,
+				openQuote,
+			};
+		},
+		ops: {
+			['$index.increment']() {
+				// @ts-ignore
+				return index.set(index + 1);
+			},
+			/** @param {string} value */
+			['$stack.addData'](value) {
+				stack.peek().data += value;
+			},
+			['$stack.addEnd']() {
+				stack.peek().end = index;
+			},
+			/** @param {string} value */
+			['$stack.addName'](value) {
+				stack.peek().name += value;
+			},
+			/** @param {string} value */
+			['$stack.addRaw'](value) {
+				stack.peek().raw += value;
+			},
+			['$stack.fromMaybeStack']() {
+				stack.push(maybeStack.peek());
+			},
+			['$stack.pop']() {
+				stack.pop();
+			},
+			['$stack.popAttribute']() {
+				const current = stack.pop({ expect: 'Attribute' });
+				if (current.get('value') instanceof ESArray && current.get('value').length < 1) {
+					current.end = current.start + current.name.length;
+					current.value = true;
+				} else {
+					current.end = index;
+				}
+				const parent = stack.peek();
+				parent.append(current);
+			},
+			['$stack.popComment']() {
+				const current = stack.pop({ expect: 'Comment' });
+
+				current.data = current.data.slice(0, -2);
+				current.end = index;
+				const last = stack.peek();
+				last.append(current);
+			},
+			['$stack.popElement']() {
+				const current = stack.pop({ expect: 'Element' });
+
+				if (
+					this.transition.from === 'endTagName'
+					|| this.transition.from === 'beforeEndTagClose'
+				) {
+					let parentTag = stack.pop();
+
+					// close any elements that don't have their own closing tags, e.g. <div><p></div>
+					while (String(parentTag.get('type')) === 'Element' && parentTag.name !== current.name) {
+						// TODO: handle autoclosed tags
+						// if (parentTag.type !== 'Element') {
+						console.error('Autoclose tags not implemented');
+						// 	const error = parser.last_auto_closed_tag && parser.last_auto_closed_tag.tag === name
+						// 		? parser_errors.invalid_closing_tag_autoclosed(name, parser.last_auto_closed_tag.reason)
+						// 		: parser_errors.invalid_closing_tag_unopened(name);
+						// 	parser.error(error, start);
+						// }
+
+						parentTag.end = current.start;
+						const nextParent = stack.pop();
+						nextParent.append(parentTag)
+						parentTag = nextParent;
 					}
-					const parent = this.data.stack.peek();
-					parent.append(current);
+					parentTag.end = index;
+					const last = stack.peek();
+					last.append(parentTag);
+				} else {
+					current.end = index;
+					const last = stack.peek();
+					last.append(current)
+				}
+			},
+			['$stack.popInvalid']() {
+				const invalid = stack.pop({ expect: 'Invalid' });
+				invalid.end = index;
 
-					return this.data.stack;
-				},
-				popComment() {
-					const current = this.data.stack.pop({ expect: 'Comment' });
+				const nodeWithError = stack.pop();
+				nodeWithError.end = index;
+				nodeWithError.error = invalid;
 
-					current.data = current.data.slice(0, -2)
-					current.end = this.data.index;
-					const last = this.data.stack.peek();
-
-					last.append(current);
-
-					return this.data.stack;
-				},
-				popElement() {
-					const current = this.data.stack.pop({ expect: 'Element' });
-
-					if (
-						this.transition.from === 'endTagName'
-						|| this.transition.from === 'beforeEndTagClose'
-					) {
-						let parentTag = this.data.stack.pop();
-
-						// close any elements that don't have their own closing tags, e.g. <div><p></div>
-						while (parentTag.type === 'Element' && parentTag.name !== current.name) {
-							// TODO: handle autoclosed tags
-							// if (parentTag.type !== 'Element') {
-							console.error('Autoclose tags not implemented');
-							// 	const error = parser.last_auto_closed_tag && parser.last_auto_closed_tag.tag === name
-							// 		? parser_errors.invalid_closing_tag_autoclosed(name, parser.last_auto_closed_tag.reason)
-							// 		: parser_errors.invalid_closing_tag_unopened(name);
-							// 	parser.error(error, start);
-							// }
-
-							parentTag.end = current.start;
-							const nextParent = this.data.stack.pop();
-							nextParent.append(parentTag)
-							parentTag = nextParent;
-						}
-						parentTag.end = this.data.index;
-						const last = this.data.stack.peek();
-						last.append(parentTag);
-					} else {
-						current.end = this.data.index;
-						const last = this.data.stack.peek();
-						last.append(current)
-					}
-
-					return this.data.stack;
-				},
-				popInvalid() {
-					const invalid = this.data.stack.pop({ expect: 'Invalid' });
-					invalid.end = this.data.index;
-
-					const nodeWithError = this.data.stack.pop();
-					nodeWithError.end = this.data.index;
-					nodeWithError.error = invalid;
-
-					const parent = this.data.stack.peek();
-					parent.append(nodeWithError);
-
-					return this.data.stack;
-				},
-				popText() {
-					const current = this.data.stack.pop({ expect: 'Text' });
-					const parent = this.data.stack.peek();
-					current.end = this.data.index;
-					// TODO: decode html character entities
-					// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
-					current.data = current.raw;
-					parent.append(current)
-
-					return this.data.stack;
-				},
-				pushAttribute() {
-					const child = new PMAttribute({
-						start: this.data.index,
-						name: '',
+				const parent = stack.peek();
+				parent.append(nodeWithError);
+			},
+			['$stack.popText']() {
+				const current = stack.pop({ expect: 'Text' });
+				const parent = stack.peek();
+				current.end = index;
+				// TODO: decode html character entities
+				// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+				current.data = current.raw;
+				parent.append(current);
+			},
+			['$stack.pushAttribute']() {
+				const child = new PMAttribute({
+					start: Number(index),
+					name: '',
+				});
+				stack.push(child);
+			},
+			['$stack.pushComment']() {
+				const tag = stack.pop({ expect: 'Element' });
+				const child = new PMComment({
+					start: tag.start,
+					data: '',
+				});
+				stack.push(child);
+			},
+			/** @param {string} value */
+			['$stack.pushInvalid'](value) {
+				if (!error) {
+					console.error('Unknown error code', {
+						transition: this.transition,
 					});
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
-				pushComment() {
-					const tag = this.data.stack.pop({ expect: 'Element' });
-					const child = new PMComment({
-						start: tag.start,
-						data: '',
-					});
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
-				pushInvalid(value) {
-					let error = this.data.error;
-					if (!error) {
-						console.error('Unknown error code', {
-							transition: this.transition,
-						});
-						error = {
-							code: 'unknown-error',
-							message: `Unexpected character '${value}'`,
-						};
-					}
-					const child = new PMInvalid({
-						start: this.data.index,
-						...error,
-					});
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
-				pushTag() {
-					const child = (new PMElement({
-						start: this.data.index,
-						name: '',
-					}));
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
-				pushText() {
-					const child = new PMText({
-						start: this.data.index,
-						data: '',
-						raw: '',
-					});
-					this.data.stack.push(child);
-					return this.data.stack;
-				},
-			}),
-			maybeStack: thing(/** @type {PMStack} */(new PMStack()), {
-				addRaw(value) {
-					const current = this.data.maybeStack.peek();
-					current.raw += value;
-					return this.data.maybeStack;
-				},
-				pop() {
-					this.data.maybeStack.pop();
-					return this.data.maybeStack;
-				},
-				popText() {
-					const current = this.data.maybeStack.pop({ expect: 'Text' });
-					const parent = this.data.maybeStack.peek();
-					current.end = this.data.index;
-					// TODO: decode html character entities
-					// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
-					current.data = current.raw;
-					parent.append(current);
+					error = {
+						code: 'unknown-error',
+						message: `Unexpected character '${value}'`,
+					};
+				}
+				const child = new PMInvalid({
+					start: Number(index),
+					...error,
+				});
+				stack.push(child);
+				error = null;
+			},
+			['$stack.pushTag']() {
+				const child = (new PMElement({
+					start: Number(index),
+					name: '',
+				}));
+				stack.push(child);
+			},
+			['$stack.pushText']() {
+				const child = new PMText({
+					start: Number(index),
+					data: '',
+					raw: '',
+				});
+				stack.push(child);
+			},
+			/** @param {string} value */
+			['$maybeStack.addRaw'](value) {
+				maybeStack.peek().raw += value;
+			},
+			['$maybeStack.pop']() {
+				maybeStack.pop();
+			},
+			['$maybeStack.popText']() {
+				const current = maybeStack.pop({ expect: 'Text' });
+				const parent = maybeStack.peek();
+				current.end = index;
+				// TODO: decode html character entities
+				// https://github.com/sveltejs/svelte/blob/dd11917fe523a66d8f5d66aab8cbcf965f30f25f/src/compiler/parse/state/tag.ts#L521
+				current.data = current.raw;
+				parent.append(current);
+			},
+			['$maybeStack.pushText']() {
+				const child = new PMText({
+					start: Number(index),
+					data: '',
+					raw: '',
+				});
+				maybeStack.push(child);
+			},
+			/** @param {string} value */
+			['$openQuote.set'](value) {
+				openQuote = value;
+			},
+			/** @param {string} value */
+			['$error.incompleteComment'](value) {
+				error = {
+					code: 'incomplete_comment',
+					message: `Expected a valid comment character but instead found ${quoteChar(value)}`,
+				};
+			},
+			/** @param {string} value */
+			['$error.invalidTagName'](value) {
+				error = {
+					code: 'invalid_tag_name',
+					message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
+				};
+			},
+			['$error.invalidVoidContent']() {
+				const current = /** @type {PMElement} */(stack.peek());
 
-					return this.data.maybeStack;
-				},
-				pushText() {
-					const child = new PMText({
-						start: this.data.index,
-						data: '',
-						raw: '',
-					});
-					this.data.maybeStack.push(child);
-					return this.data.maybeStack;
-				},
-			}),
-			openQuote: thing(/** @type {'"' | '\''} */'\'', {
-				set(value) {
-					return value;
-				},
-			}),
-			error: thing(/** @type {{ code: string; message: string } | null} */(null), {
-				incompleteComment(value) {
-					return {
-						code: 'incomplete_comment',
-						message: `Expected a valid comment character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidTagName(value) {
-					return {
-						code: 'invalid_tag_name',
-						message: `Expected a valid tag character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidVoidContent() {
-					const current = /** @type {PMElement} */(this.data.stack.peek());
-
-					return {
-						code: 'invalid-void-content',
-						message: `<${current.name}> is a void element and cannot have children, or a closing tag`
-					};
-				},
-				invalidAttributeName(value) {
-					return {
-						code: 'invalid_attribute_name',
-						message: `Expected a valid attribute character but instead found ${quoteChar(value)}`,
-					};
-				},
-				invalidUnquotedValue(value) {
-					return {
-						code: 'invalid_unquoted_value',
-						message: `${quoteChar(value)} is not permitted in unquoted attribute values`
-					}
-				},
-				unclosedBlock() {
-					const current = /** @type {PMAttribute | PMComment | PMElement} */(
-						this.data.stack.peek()
-					);
-					const types = {
-						Attribute: 'tag',
-						Comment: 'comment',
-						Element: `tag`,
-					};
-					const type = types[current.type] || 'block';
-					return {
-						code: `unclosed-${type}`,
-						message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
-					};
-				},
-			}),
+				error = {
+					code: 'invalid-void-content',
+					message: `<${current.name}> is a void element and cannot have children, or a closing tag`
+				};
+			},
+			/** @param {string} value */
+			['$error.invalidAttributeName'](value) {
+				error = {
+					code: 'invalid_attribute_name',
+					message: `Expected a valid attribute character but instead found ${quoteChar(value)}`,
+				};
+			},
+			/** @param {string} value */
+			['$error.invalidUnquotedValue'](value) {
+				error = {
+					code: 'invalid_unquoted_value',
+					message: `${quoteChar(value)} is not permitted in unquoted attribute values`
+				}
+			},
+			['$error.unclosedBlock']() {
+				const current = /** @type {PMAttribute | PMComment | PMElement} */(
+					stack.peek()
+				);
+				const types = {
+					Attribute: 'tag',
+					Comment: 'comment',
+					Element: `tag`,
+				};
+				const type = types[current.type] || 'block';
+				error = {
+					code: `unclosed-${type}`,
+					message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
+				};
+			},
 		},
 		config: {
 			states: {
@@ -907,11 +886,6 @@ export function parser(source) {
 									'$stack.popElement',
 								],
 							},
-							{
-								actions: [
-									'log',
-								],
-							},
 						],
 					},
 				},
@@ -1034,55 +1008,69 @@ export function parser(source) {
 			},
 		},
 		conditions: {
+			/** @param {string} value */
 			isAlphaCharacter(value) {
 				return /[A-z]/.test(value);
 			},
+			/** @param {string} value */
 			isEquals(value) {
 				return value === '=';
 			},
+			/** @param {string} value */
 			isExclamation(value) {
 				return value === '!';
 			},
+			/** @param {string} value */
 			isForwardSlash(value) {
 				return value === '/';
 			},
 			isDone() {
 				// TODO: Listen for a EOF char so that we never need the original source
-				return this.data.index === this.data.source.length;
+				return Number(index) === source.length;
 			},
+			/** @param {string} value */
 			isInvalidUnquotedValue(value) {
 				return /[\s"'=<>`]/.test(value);
 			},
+			/** @param {string} value */
 			isMinus(value) {
 				return value === '-';
 			},
+			/** @param {string} value */
 			isNonAlphaCharacter(value) {
 				return !/[A-z]/.test(value);
 			},
+			/** @param {string} value */
 			isQuote(value) {
 				return value === '"' || value === '\'';
 			},
+			/** @param {string} value */
 			isQuoteClosed(value) {
-				return value === this.data.openQuote;
+				return value === openQuote;
 			},
+			/** @param {string} value */
 			isTagOpen(value) {
 				return value === '<';
 			},
+			/** @param {string} value */
 			isTagClose(value) {
 				return value === '>';
 			},
+			/** @param {string} value */
 			isVoidTag(value) {
-				const current = this.data.stack.peek({ expect: 'Element' });
+				const current = stack.peek({ expect: 'Element' });
 				return isVoidElement(current.name + value);
 			},
+			/** @param {string} value */
 			isWhitespace(value) {
 				return /\s/.test(value);
 			},
 			stackNotEmpty() {
-				return this.data.stack.size > 1;
+				return stack.size > 1;
 			},
 		},
 		actions: {
+			/** @param {string} value */
 			log(value) {
 				console.log(structuredClone({
 					value,
@@ -1105,7 +1093,7 @@ export function transformToSvelte(parser) {
 	const fragment = parser.data.stack.peek({ expect: 'Fragment' });
 
 	// Do not modify original stack
-	const children = structuredClone(fragment.children);
+	const children = /** @type {any} */(fragment.toJSON()['children']);
 
 	// Remove trailing whitespace text nodes
 	let i = children.length - 1;
@@ -1128,7 +1116,7 @@ export function transformToSvelte(parser) {
 		const node = children[i];
 		if (node.type === 'Element' && node.name === 'script') {
 			const contextIndex = node.attributes
-				.findIndex(attribute => attribute.name === 'context');
+				.findIndex((/** @type {{ name: string; }} */ attribute) => attribute.name === 'context');
 			/** @type {'default' | 'module'} */
 			let context = 'default';
 			if (contextIndex > -1) {
@@ -1157,7 +1145,7 @@ export function transformToSvelte(parser) {
 						start: contextAttribute.start,
 						end: contextAttribute.end,
 						...error,
-					});
+					}).toJSON();
 					nonscripts.push(node)
 					continue;
 				}
@@ -1181,7 +1169,7 @@ export function transformToSvelte(parser) {
 					start: node.start,
 					end: node.end,
 					...error,
-				});
+				}).toJSON();
 				nonscripts.push(node);
 				continue;
 			}
@@ -1193,13 +1181,13 @@ export function transformToSvelte(parser) {
 					end: scriptChild.end,
 					code: 'invalid-script-nested-elements',
 					message: 'Script elements cannot have nested children',
-				});
+				}).toJSON();
 				nonscripts.push(node);
 			} else {
-				const start  = scriptChild
+				const start = scriptChild
 					? scriptChild.start
 					: parser.data.source.indexOf('</', node.start);
-				const end  = scriptChild
+				const end = scriptChild
 					? scriptChild.end
 					: start;
 				let ast;
@@ -1210,12 +1198,13 @@ export function transformToSvelte(parser) {
 						+ (scriptChild ? scriptChild.raw : '');
 					ast = /** @type {import('estree').Program} */(acorn.parse(code));
 					/** @type {any} */(ast).start = start;
-					const script = new PMScript({
+					const script = Object.assign(new PMScript({
 						start: node.start,
 						end: node.end,
 						context,
-						content: ast,
-					});
+						// @ts-ignore
+						content: ''
+					}).toJSON(), { content: JSON.parse(JSON.stringify(ast)) });
 					if (context === 'default') {
 						instance = script;
 					} else if (context === 'module') {
@@ -1228,7 +1217,7 @@ export function transformToSvelte(parser) {
 						end,
 						code: 'parse-error',
 						message: /** @type {Error} */(error).message.replace(positionIndicatorRE, '')
-					});
+					}).toJSON();
 					nonscripts.push(node);
 				}
 			}
@@ -1244,6 +1233,7 @@ export function transformToSvelte(parser) {
 
 	if (nonscripts.length) {
 		start = nonscripts[0].start;
+		// @ts-ignore
 		while (/\s/.test(parser.data.source[start])) start += 1;
 
 		// TODO: is optional end on template nodes still necessary?
@@ -1253,6 +1243,7 @@ export function transformToSvelte(parser) {
 		start = end = null;
 	}
 
+	/** @type {Record<string, any>} */
 	const result = {
 		html: {
 			start,
@@ -1260,10 +1251,14 @@ export function transformToSvelte(parser) {
 			type: 'Fragment',
 			children: nonscripts,
 		},
-		instance,
-		module,
 	}
 
+	if (instance) {
+		result.instance = instance
+	}
+	if (module) {
+		result.module = module
+	}
 
 	return result;
 }

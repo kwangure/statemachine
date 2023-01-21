@@ -1,5 +1,5 @@
 /**
- * @typedef {import("./nodes/nodes").PMTemplateNode} PMTemplateNode
+ * @typedef {import("./nodes/nodes.js").PMTemplateNode} PMTemplateNode
  */
 
 export class PMStack {
@@ -23,7 +23,7 @@ export class PMStack {
 			throw Error('Attempted to peek an empty stack');
 		}
 		const value = /** @type {PMTemplateNode} */(this.#value.at(-1 * depth));
-		if (expect && value.type !== expect) {
+		if (expect && value.get('type') != expect) {
 			throw Error(`Expected to peek a '${expect}' node, but found a '${value.type}' instead.`);
 		}
 		return /** @type {Extract<PMTemplateNode, { type: T }>} */(value);
@@ -38,7 +38,7 @@ export class PMStack {
 			throw Error('Attempted to pop an empty stack');
 		}
 		const value = /** @type {PMTemplateNode} */(this.#value.pop());
-		if (options.expect && value.type !== options.expect) {
+		if (options.expect && value.get('type') != options.expect) {
 			throw Error(`Expected to pop a '${options.expect}' node, but found a '${value.type}' instead.`);
 		}
 		return /** @type {Extract<PMTemplateNode, { type: T }>} */(value);
