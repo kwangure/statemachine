@@ -1,4 +1,4 @@
-import { ESArray, ESBoolean, ESMap, ESNumber, ESString } from "eventscript/nodes";
+import { ESArray, ESMap, ESNumber, ESString } from "eventscript/nodes";
 
 /** *
  * @param {PMBaseNode<string>} node
@@ -24,7 +24,7 @@ class PMBaseNode extends ESMap {
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.get('type')}' as a child.`);
+		throw Error(`${this.constructor.name.replace('PM', '')} nodes do not take '${node.type}' as a child.`);
 	}
 
 	/** @type {number | ESNumber} */
@@ -101,22 +101,10 @@ class PMBaseNode extends ESMap {
 
 	/** @type {boolean | any[]} */
 	get value() {
-		const value = this.get('value');
-		if (!value) throw PMError(this, 'value');
-		if (value instanceof Boolean) {
-			return Boolean(value);
-		}
-		return [...value];
+		throw Error('Use node.get(\'value\') instead.');
 	}
 	set value(_value) {
-		const value = this.get('value');
-		if (!value) throw PMError(this, 'value');
-		// TODO: Preserve subscribers? Cast? 🤔
-		if (typeof _value === 'boolean') {
-			this.set('value', new ESBoolean(_value));
-		} else {
-			this.set('value', new ESArray(_value));
-		}
+		throw Error('Use node.set(\'value\', value) instead.');
 	}
 }
 
@@ -146,7 +134,7 @@ export class PMAttribute extends PMBaseNode {
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (String(node.get('type'))) {
+		switch (node.type) {
 			case 'Text':
 				if (this.get('value') instanceof ESArray) {
 					this.get('value').push(node);
@@ -183,7 +171,7 @@ export class PMElement extends PMBaseNode {
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (String(node.get('type'))) {
+		switch (node.type) {
 			case 'Attribute':
 				this.get('attributes').push(node);
 				break;
@@ -194,7 +182,7 @@ export class PMElement extends PMBaseNode {
 				break;
 			case 'Text':
 				const lastChild = this.get('children').at(-1);
-				if (String(lastChild?.get('type')) === 'Text') {
+				if (lastChild?.type === 'Text') {
 					lastChild.end = node.end;
 					lastChild.raw += node.raw;
 					lastChild.data = lastChild.raw;
@@ -247,14 +235,14 @@ export class PMFragment extends PMBaseNode {
 	 * @param {PMTemplateNode} node
 	 */
 	append(node) {
-		switch (String(node.get('type'))) {
+		switch (node.type) {
 			case 'Comment':
 			case 'Element':
 				this.get('children').push(node);
 				break;
 			case 'Text':
 				const lastChild = this.get('children').at(-1);
-				if (String(lastChild?.get('type')) === 'Text') {
+				if (lastChild?.type === 'Text') {
 					lastChild.end = node.end;
 					lastChild.raw += node.raw;
 					lastChild.data = lastChild.raw;
@@ -291,7 +279,7 @@ export class PMInvalid extends PMBaseNode {
 	 * @param {any} node
 	 */
 	append(node) {
-		throw Error(`Invalid nodes do not take '${node.get('type')}' as child.`);
+		throw Error(`Invalid nodes do not take '${node.type}' as child.`);
 	}
 }
 

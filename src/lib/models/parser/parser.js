@@ -1,6 +1,6 @@
 import * as acorn from './acorn.js';
 import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes.js';
-import { ESArray, ESNumber } from "eventscript/nodes";
+import { ESArray, ESBoolean, ESNumber } from "eventscript/nodes";
 import { Machine } from '$lib/machine/create.js'
 import { isVoidElement } from './utlils.js';
 import { PMStack } from './data.js';
@@ -70,7 +70,7 @@ export function parser(source) {
 				const current = stack.pop({ expect: 'Attribute' });
 				if (current.get('value') instanceof ESArray && current.get('value').length < 1) {
 					current.end = current.start + current.name.length;
-					current.value = true;
+					current.set('value', new ESBoolean(true));
 				} else {
 					current.end = index;
 				}
@@ -95,7 +95,7 @@ export function parser(source) {
 					let parentTag = stack.pop();
 
 					// close any elements that don't have their own closing tags, e.g. <div><p></div>
-					while (String(parentTag.get('type')) === 'Element' && parentTag.name !== current.name) {
+					while (parentTag.type === 'Element' && parentTag.name !== current.name) {
 						// TODO: handle autoclosed tags
 						// if (parentTag.type !== 'Element') {
 						console.error('Autoclose tags not implemented');
