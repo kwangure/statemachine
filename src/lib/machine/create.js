@@ -36,6 +36,7 @@ export class Machine {
 	#children = [];
 	#data;
 	#state;
+	#stateMap;
 	/**
 	 * @type {{
 	 * 		to: string | null,
@@ -69,14 +70,14 @@ export class Machine {
 		this.config = options.config;
 		this.#data = options.data;
 
-		const states = Object.keys(this.config.states);
-		this.#state = states[0];
+		this.#stateMap = new Map(this.config.states);
+		this.#state = this.config.states[0][0];
 		this.#stores = Object.assign(nullo(), options.ops, {
 			[`$${TRANSITION_ACTIVE}.true`]: () => this.#transition.active = true,
 			[`$${TRANSITION_ACTIVE}.false`]: () => this.#transition.active = false,
 			[`$${SUBSCRIBERS}.call`]: this.#callSubscribers,
 		});
-		for (const state of states) {
+		for (const state of this.#stateMap.keys()) {
 			this.#stores[`$${STATE}.${String(state)}`] = () => this.#state = state;
 			this.#stores[`$${TRANSITION_TO}.${String(state)}`] = () => this.#transition.to = state;
 			this.#stores[`$${TRANSITION_FROM}.${String(state)}`] = () => this.#transition.from = state;
@@ -85,18 +86,18 @@ export class Machine {
 		const handlerStateProps = nullo();
 		const handlerMap = nullo();
 		const self = this;
-		for (let i = 0; i < states.length; i++) {
+		for (const stateName of this.#stateMap.keys()) {
 			const listeners = {
 				// check for machine-level listener if config.states[state] doesn't exist
 				...this.config.on,
-				...this.config.states[states[i]].on,
+				...this.#stateMap.get(stateName).on,
 			};
 			const listenerMap = nullo();
 			for (const prop in listeners) {
 				listenerMap[prop] = (/** @type {any} */ ...args) => {
 					this.#executeHandlers([
 						...(listeners[prop] ?? []),
-						...(this.config.states[states[i]].always || []),
+						...(this.#stateMap.get(stateName).always || []),
 					], ...args);
 				}
 				if (!Object.hasOwn(handlerMap, prop)) {
@@ -105,11 +106,11 @@ export class Machine {
 					}
 				}
 			}
-			handlerStateProps[states[i]] = listenerMap;
+			handlerStateProps[stateName] = listenerMap;
 		};
 
 		this.emit = handlerMap;
-		this.#executeHandlers(this.config.states[this.state].entry || [])
+		this.#executeHandlers(this.#stateMap.get(this.state).entry || [])
 	}
 	/**
 	 * @param {Machine<any>[]} children
@@ -156,11 +157,11 @@ export class Machine {
 					{ actions: [`$${TRANSITION_TO}.${String(transitionTo)}`] },
 					{ actions: [`$${TRANSITION_FROM}.${String(this.state)}`] },
 					{ actions: [`$${TRANSITION_ACTIVE}.true`] },
-					...this.config.states[this.state].exit || [],
+					...this.#stateMap.get(this.state).exit || [],
 					{ actions: transitionActions },
 					{ actions: [`$${STATE}.${String(transitionTo)}`] },
-					...this.config.states[transitionTo].entry || [],
-					...this.config.states[transitionTo].always || [],
+					...this.#stateMap.get(transitionTo).entry || [],
+					...this.#stateMap.get(transitionTo).always || [],
 					{ actions: [`$${TRANSITION_ACTIVE}.false`] },
 					{ actions: [`$${SUBSCRIBERS}.call`] },
 					CALL_SUBSCRIBERS_ACTION,
