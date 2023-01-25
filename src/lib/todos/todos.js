@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { Machine } from '$lib/machine/create';
+import { Machine } from '$lib/machine/create.js';
 import { todo } from "./todo.js";
 import { uid } from 'uid';
 
@@ -26,11 +26,18 @@ function getLocalStorageItem(key, defaultValue) {
 }
 
 export function todos() {
+	let newTodo = '';
+	let todos = /** @type {ReturnType<todo>[]} */([]);
+	let filter = /** @type {'all' | 'active' | 'completed'} */('all');
+	let activeTodos = /** @type {ReturnType<todo>[]} */([]);
+	let completedTodos = /** @type {ReturnType<todo>[]} */([]);
+	let filteredTodos = /** @type {ReturnType<todo>[]} */([]);
+	let markAllAs = /** @type {'active' | 'completed'} */('active');
+	let allCompleted = false;
 	return new Machine({
-		initial: 'loading',
 		config: {
-			states: {
-				loading: {
+			states: [
+				['loading', {
 					entry: [{
 						transitionTo: 'ready',
 						actions: [
@@ -43,9 +50,9 @@ export function todos() {
 							'$markAllAs.update',
 						],
 					}],
-				},
-				ready: {},
-			},
+				}],
+				['ready', {}],
+			],
 			on: {
 				'CLEAR_COMPLETED': [{
 					actions: [
@@ -128,92 +135,92 @@ export function todos() {
 				}],
 			}
 		},
-		data: {
-			newTodo: '',
-			todos: /** @type {ReturnType<todo>[]} */([]),
-			filter: /** @type {'all' | 'active' | 'completed'} */('all'),
-			activeTodos: /** @type {ReturnType<todo>[]} */([]),
-			completedTodos: /** @type {ReturnType<todo>[]} */([]),
-			filteredTodos: /** @type {ReturnType<todo>[]} */([]),
-			markAllAs: /** @type {'active' | 'completed'} */('active'),
-			allCompleted: false,
+		data() {
+			return {
+				newTodo,
+				todos,
+				filter,
+				activeTodos,
+				completedTodos,
+				filteredTodos,
+				markAllAs,
+			};
 		},
 		ops: {
-			newTodo: {
-				update: (newValue) => newValue,
-				empty: () => '',
+			/** @param {string} newValue */
+			['$newTodo.update']: (newValue) => {
+				newTodo = newValue;
 			},
-			todos: {
-				activateAll() {
-					return this.data.todos.map((todo) => {
-						todo.emit.SET_ACTIVE();
-						return todo;
-					});
-				},
-				completeAll() {
-					return this.data.todos.map((todo) => {
-						todo.emit.SET_COMPLETED();
-						return todo;
-					});
-				},
-				forceRerender() {
-					return [...this.data.todos];
-				},
-				fromChildren() {
-					return [...this.children];
-				},
+			['$newTodo.empty']: () => {
+				newTodo = '';
 			},
-			filter: {
-				update: (newFilter) => newFilter,
+			['$todos.activateAll']() {
+				todos.forEach((todo) => {
+					todo.emit.SET_ACTIVE();
+				});
 			},
-			activeTodos: {
-				update() {
-					return this.data.todos
-						.filter((todo) => !get(todo).data.completed);
-				},
+			['$todos.completeAll']() {
+				todos.forEach((todo) => {
+					todo.emit.SET_COMPLETED();
+				});
 			},
-			completedTodos: {
-				update() {
-					return this.data.todos
-						.filter((todo) => get(todo).data.completed);
+			['$todos.forceRerender']() {
+				todos = [...todos];
+			},
+			['$todos.fromChildren']() {
+				todos = [...this.children];
+			},
+			/** @param {'all' | 'active' | 'completed'} newFilter */
+			['$filter.update']: (newFilter) => {
+				console.log('filter.update', { newFilter });
+				filter = newFilter;
+			},
+			['$activeTodos.update']() {
+				activeTodos = todos
+					.filter((todo) => !get(todo).data.completed);
+			},
+			['$completedTodos.update']() {
+				completedTodos = todos
+					.filter((todo) => get(todo).data.completed);
+			},
+			['$filteredTodos.update']() {
+				switch (filter) {
+					case 'active':
+						filteredTodos = activeTodos;
+						break;
+					case 'completed':
+						filteredTodos = completedTodos;
+						break;
+					default:
+						filteredTodos = todos;
 				}
 			},
-			filteredTodos: {
-				update() {
-					switch (this.data.filter) {
-						case 'active':
-							return this.data.activeTodos;
-						case 'completed':
-							return this.data.completedTodos;
-						default:
-							return this.data.todos;
-					}
-				}
+			['$allCompleted.update']() {
+				allCompleted = todos.length > 0
+					&& activeTodos.length === 0;
 			},
-			allCompleted: {
-				update() {
-					return this.data.todos.length > 0
-						&& this.data.activeTodos.length === 0;
-				},
-			},
-			markAllAs: {
-				update() {
-					const allCompleted = this.data.todos.length > 0 && this.data.todos
-						.filter((todo) => !get(todo).data.completed).length === 0;
-					return allCompleted ? "active" : "completed";
-				}
-			},
+			['$markAllAs.update']() {
+				const allCompleted = todos.length > 0 && todos
+					.filter((todo) => !get(todo).data.completed).length === 0;
+				markAllAs = allCompleted ? "active" : "completed";
+			}
 		},
 		actions: {
+			/**
+			 * @param {string} title
+			 */
 			addNew(title) {
 				const newTodo = todo(createNewTodo(title.trim()));
 				this.append(newTodo);
 			},
+			/**
+			 * @param {{ remove: () => void; }} child
+			 */
 			delete(child) {
 				child.remove();
 			},
 			clearCompleted() {
-				return this.data.todos.forEach((todo) => {
+				todos.forEach((todo) => {
 					if (todo.data.completed) {
 						todo.remove();
 					}
@@ -230,7 +237,7 @@ export function todos() {
 			},
 			persist() {
 				try {
-					const todosJson = JSON.stringify(this.data.todos.map((todo) => get(todo).data));
+					const todosJson = JSON.stringify(todos.map((todo) => get(todo).data));
 					localStorage.setItem(TODOS_STORE, todosJson);
 				} catch (error) {
 					console.error(error);
@@ -238,7 +245,10 @@ export function todos() {
 			},
 		},
 		conditions: {
-			notEmpty: (value) => Boolean(value.trim().length),
+			/** @param {string} value */
+			notEmpty(value) {
+				return Boolean(value.trim().length);
+			}
 		},
 	});
 }

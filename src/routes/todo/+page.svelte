@@ -1,8 +1,8 @@
 <script>
 	import './todo.css';
     import { page } from "$app/stores";
-    import { Todos } from "$lib/components/todos";
-    import { todos } from "$lib/models/todos";
+    import { Todos } from "$lib/todos";
+    import { todos } from "$lib/todos";
 
 	// https://codesandbox.io/s/xstate-todomvc-33wr94qv1
 </script>

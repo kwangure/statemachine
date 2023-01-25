@@ -6,6 +6,7 @@
 	/** @type {ReturnType<import('$lib/models/todos').todos>} */
 	export let todos;
 
+	$: console.log({ filter });
 	$: todos.emit.SHOW(filter);
 </script>
 

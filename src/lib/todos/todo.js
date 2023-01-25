@@ -1,4 +1,4 @@
-import { Machine } from '$lib/machine/create';
+import { Machine } from '$lib/machine/create.js';
 
 /**
     @param {{
@@ -8,7 +8,19 @@ import { Machine } from '$lib/machine/create';
     }} data
  */
 export function todo(data) {
+    let id = data.id;
+    let completed = data.completed;
+    let prevTitle = '';
+    let title = data.title;
     return new Machine({
+        data() {
+            return {
+                id,
+                completed,
+                prevTitle,
+                title,
+            }
+        },
         actions: {
             commit() {
                 /** @type {ReturnType<import('./todos.js').todos>} */(this.parent)
@@ -21,36 +33,28 @@ export function todo(data) {
         },
         conditions: {
             titleNotEmpty() {
-                return this.data.title.trim().length > 0;
+                return title.trim().length > 0;
             },
-        },
-        data: {
-            id: data.id,
-            completed: data.completed,
-            prevTitle: '',
-            title: data.title,
         },
         ops: {
-            id: {},
-            completed: {
-                falsify: () => false,
-                toggle() {
-                    return !this.data.completed;
-                },
-                truthify: () => true,
+            ['$completed.falsify']: () => {
+                completed = false;
             },
-            prevTitle: {
-                fromTitle() {
-                    return this.data.title;
-                },
+            ['$completed.toggle']() {
+                completed = !completed;
             },
-            title: {
-                fromPrevTitle() {
-                    return this.data.prevTitle;
-                },
-                set(newTitle) {
-                    return newTitle;
-                },
+            ['$completed.truthify']: () => {
+                completed = true;
+            },
+            ['$prevTitle.fromTitle']() {
+                prevTitle = title;
+            },
+            ['$title.fromPrevTitle']() {
+                title = prevTitle;
+            },
+            /** @param {string} newTitle */
+            ['$title.set'](newTitle) {
+                title = newTitle;
             },
         },
         config: {
@@ -60,8 +64,8 @@ export function todo(data) {
                     actions: ['commit'],
                 }],
             },
-            states: {
-                reading: {
+            states: [
+                ['reading', {
                     on: {
                         EDIT: [{
                             transitionTo: "editing",
@@ -85,14 +89,14 @@ export function todo(data) {
                             ],
                         }],
                     }
-                },
-                deleted: {
+                }],
+                ['deleted', {
                     entry: [{
                         actions: ["delete"]
                     }],
                     on: {},
-                },
-                editing: {
+                }],
+                ['editing', {
                     entry: [{
                         actions: [
                             "$prevTitle.fromTitle",
@@ -129,8 +133,8 @@ export function todo(data) {
                             },
                         ],
                     }
-                },
-            },
+                }],
+            ],
         },
     });
 }
