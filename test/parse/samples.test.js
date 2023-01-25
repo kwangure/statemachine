@@ -1,5 +1,5 @@
 import { expect, describe, test } from 'vitest';
-import { parser as createParser, transformToSvelte } from '../../src/lib/models/parser';
+import { parser as createParser, transformToSvelte } from '../../src/lib/parser';
 import fs from 'node:fs';
 import { tryToLoadJson } from './helpers';
 

@@ -1,7 +1,7 @@
 <script>
 	import { Code, json } from '@kwangure/strawberry/default/code';
 	import { Container } from '@kwangure/strawberry/default/input/container';
-	import { parser as stateParser, transformToSvelte } from '$lib/models/parser';
+	import { parser as stateParser, transformToSvelte } from '$lib/parser';
 	import { parse as svelteParse } from 'svelte/compiler';
 	import { escape } from 'svelte/internal';
     import Diff from '$lib/components/diff/diff.svelte';

@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { Machine } from '$lib/machine/create';
-import { todo } from "./todo";
+import { todo } from "./todo.js";
 import { uid } from 'uid';
 
 const TODOS_STORE = 'todos';
