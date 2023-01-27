@@ -1,0 +1,39 @@
+{
+    "html": {
+        "start": 0,
+        "end": 19,
+        "type": "Fragment",
+        "children": [
+            {
+                "start": 0,
+                "end": 19,
+                "type": "Element",
+                "name": "d",
+                "attributes": [
+                    {
+                        "start": 3,
+                        "end": 14,
+                        "type": "Attribute",
+                        "name": "d",
+                        "value": [
+                            {
+                                "start": 5,
+                                "end": 14,
+                                "type": "MustacheTag",
+                                "raw": "abc abc",
+                                "error": {
+                                    "code": "invalid-javascript-multiple-expression",
+                                    "message": "Expected a single expression in between the curly braces",
+                                    "start": 10,
+                                    "end": 12,
+                                    "type": "Invalid"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "children": []
+            }
+        ]
+    }
+}

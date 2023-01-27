@@ -26,6 +26,14 @@ export const beforeAttributeValueState = [
 					]
 				},
 				{
+					"transitionTo": "attributeValueMustache",
+					"condition": "isSvelteMustacheOpen",
+					"actions": [
+						"$stack.pushMustache",
+						"$index.increment"
+					]
+				},
+				{
 					"transitionTo": "fragment",
 					"condition": "isTagClose",
 					"actions": [

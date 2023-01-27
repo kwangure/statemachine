@@ -1,0 +1,39 @@
+{
+    "html": {
+        "start": 0,
+        "end": 37,
+        "type": "Fragment",
+        "children": [
+            {
+                "start": 0,
+                "end": 37,
+                "type": "Element",
+                "name": "d",
+                "attributes": [
+                    {
+                        "start": 3,
+                        "end": 32,
+                        "type": "Attribute",
+                        "name": "d",
+                        "value": [
+                            {
+                                "start": 5,
+                                "end": 32,
+                                "type": "MustacheTag",
+                                "raw": "abc () => { return 'abc'}",
+                                "error": {
+                                    "code": "invalid-javascript-expression",
+                                    "message": "Unexpected token (1:13)",
+                                    "start": 15,
+                                    "end": 32,
+                                    "type": "Invalid"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "children": []
+            }
+        ]
+    }
+}

@@ -1,4 +1,5 @@
 import { ESArray, ESMap, ESNumber, ESString } from "eventscript/nodes";
+import * as acorn from '../acorn.js';
 
 /** *
  * @param {PMBaseNode<string>} node
@@ -109,7 +110,7 @@ class PMBaseNode extends ESMap {
 }
 
 /**
- * @typedef {PMAttribute | PMComment | PMElement | PMFragment | PMInvalid | PMText} PMTemplateNode
+ * @typedef {PMAttribute | PMComment | PMElement | PMFragment | PMInvalid | PMMustacheTag | PMText} PMTemplateNode
  */
 
 /** @extends {PMBaseNode<'Attribute'>} */
@@ -135,6 +136,7 @@ export class PMAttribute extends PMBaseNode {
 	 */
 	append(node) {
 		switch (node.type) {
+			case 'MustacheTag':
 			case 'Text':
 				if (this.get('value') instanceof ESArray) {
 					this.get('value').push(node);
@@ -274,13 +276,6 @@ export class PMInvalid extends PMBaseNode {
 			['type', new ESString('Invalid')],
 		]);
 	}
-
-	/**
-	 * @param {any} node
-	 */
-	append(node) {
-		throw Error(`Invalid nodes do not take '${node.type}' as child.`);
-	}
 }
 
 /** @extends {PMBaseNode<'Script'>} */
@@ -320,5 +315,60 @@ export class PMText extends PMBaseNode {
 			['raw', new ESString(raw)],
 			['data', new ESString(data)]
 		]);
+	}
+}
+
+/** @extends {PMBaseNode<'MustacheTag'>} */
+export class PMMustacheTag extends PMBaseNode {
+	/**
+	 * @param {Object} options
+	 * @param {string} options.raw
+	 * @param {number} options.start
+	 * @param {number} [options.end]
+	 */
+	constructor({ raw, start, end }) {
+		super([
+			['start', new ESNumber(start)],
+			['end', new ESNumber(end || start)],
+			['type', new ESString('MustacheTag')],
+			['raw', new ESString(raw)],
+		]);
+	}
+	toJSON() {
+		const json = super.toJSON();
+		const start = /** @type {number} */(json.start) + 1;
+		const source = `${' '.repeat(start)}${json.raw}`.trimEnd();
+		const end = source.length - 1;
+		try {
+			const expressions = []
+			let current = start;
+			while (current < end) {
+				const expression = acorn.parseExpressionAt(source, current);
+				current = expression.end;
+				expressions.push(expression);
+			}
+			if (expressions.length > 1) {
+				const invalid = new PMInvalid({
+					start: expressions.at(1).start,
+					end,
+					code: 'invalid-javascript-multiple-expression',
+					message: 'Expected a single expression in between the curly braces',
+				});
+				json.error = JSON.parse(JSON.stringify(invalid));
+			} else {
+				json.expression = expressions[0];
+				delete json.raw;
+			}
+		} catch (/** @type {any} */ error) {
+			const invalid = new PMInvalid({
+				start: error.raisedAt,
+				end: this.get('end'),
+				code: 'invalid-javascript-expression',
+				message: error.message,
+			});
+			json.error = JSON.parse(JSON.stringify(invalid));
+		}
+
+		return json;
 	}
 }

@@ -1,5 +1,5 @@
 import * as acorn from './acorn.js';
-import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMScript, PMText } from './nodes/nodes.js';
+import { PMAttribute, PMComment, PMElement, PMFragment, PMInvalid, PMMustacheTag, PMScript, PMText } from './nodes/nodes.js';
 import { ESArray, ESBoolean, ESNumber } from "eventscript/nodes";
 import { Machine } from '$lib/machine/create.js'
 import { isVoidElement } from './utlils.js';
@@ -10,6 +10,7 @@ import { afterAttributeValueQuoted } from './states/afterAttributeValueQuoted.js
 import { afterCommentBangState } from './states/afterCommentBang.js';
 import { afterCommentContentState } from './states/afterCommentContent.js';
 import { attributeNameState } from './states/attributeName.js';
+import { attributeValueMustacheState } from './states/attributeValueMustache.js';
 import { attributeValueQuotedState } from './states/attributeValueQuoted.js';
 import { attributeValueUnquotedState } from './states/attributeValueUnquoted.js';
 import { beforeAttributeNameState } from './states/beforeAttributeName.js';
@@ -39,11 +40,11 @@ function quoteChar(char) {
 
 /**
  * @typedef {import('./nodes/nodes.js').PMTemplateNode} PMTemplateNode
- */
-/**
  * @param {string} source
+ * @param {{ language?: 'svelte' | 'html'; }} [options]
  */
-export function parser(source) {
+export function parser(source, options = {}) {
+	const { language = 'svelte' } = options;
 	let index = new ESNumber(0);
 	let html = new PMFragment({
 		start: Number(index),
@@ -51,6 +52,7 @@ export function parser(source) {
 	});
 	let stack = new PMStack(html);
 	let maybeStack = new PMStack();
+	let mustacheDepth = new ESNumber(0);
 	let openQuote = /** @type {'"' | '\''} */'\'';
 	let error = /** @type {{ code: string; message: string } | null} */(null);
 	const parser = new Machine({
@@ -59,7 +61,9 @@ export function parser(source) {
 				error,
 				index: Number(index),
 				html,
+				language,
 				maybeStack,
+				mustacheDepth,
 				source,
 				stack,
 				openQuote,
@@ -155,6 +159,12 @@ export function parser(source) {
 				const parent = stack.peek();
 				parent.append(nodeWithError);
 			},
+			['$stack.popMustache']() {
+				const current = stack.pop({ expect: 'MustacheTag' });
+				const parent = stack.peek();
+				current.end = index;
+				parent.append(current);
+			},
 			['$stack.popText']() {
 				const current = stack.pop({ expect: 'Text' });
 				const parent = stack.peek();
@@ -202,6 +212,13 @@ export function parser(source) {
 					start: Number(index),
 					name: '',
 				}));
+				stack.push(child);
+			},
+			['$stack.pushMustache']() {
+				const child = new PMMustacheTag({
+					start: Number(index),
+					raw: '',
+				});
 				stack.push(child);
 			},
 			['$stack.pushText']() {
@@ -291,6 +308,14 @@ export function parser(source) {
 					message: `${type[0].toUpperCase() + type.substring(1)} was left open`,
 				};
 			},
+			['$mustacheDepth.increment']() {
+				// @ts-ignore
+				return mustacheDepth.set(mustacheDepth + 1);
+			},
+			['$mustacheDepth.decrement']() {
+				// @ts-ignore
+				return mustacheDepth.set(mustacheDepth - 1);
+			},
 		},
 		config: {
 			states: [
@@ -300,6 +325,7 @@ export function parser(source) {
 				afterCommentBangState,
 				afterCommentContentState,
 				attributeNameState,
+				attributeValueMustacheState,
 				attributeValueQuotedState,
 				attributeValueUnquotedState,
 				beforeAttributeNameState,
@@ -364,6 +390,20 @@ export function parser(source) {
 			/** @param {string} value */
 			isTagOpen(value) {
 				return value === '<';
+			},
+			/** @param {string} value */
+			isSvelteMustacheClosed(value) {
+				return language === 'svelte' && value === '}';
+			},
+			/** @param {string} value */
+			isSvelteMustacheOpen(value) {
+				return language === 'svelte' && value === '{';
+			},
+			/** @param {string} value */
+			isSveltemustacheDepthDone(value) {
+				return language === 'svelte'
+					&& Number(mustacheDepth) === 0
+					&& value === '}';
 			},
 			/** @param {string} value */
 			isTagClose(value) {
