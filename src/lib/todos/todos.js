@@ -141,6 +141,7 @@ export function todos() {
 				todos,
 				filter,
 				activeTodos,
+				allCompleted,
 				completedTodos,
 				filteredTodos,
 				markAllAs,
