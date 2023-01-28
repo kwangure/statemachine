@@ -25,7 +25,7 @@
 	"dependencies": {
 		"@kwangure/strawberry": "^0.54.0",
 		"diff-match-patch": "^1.0.5",
-		"eventscript": "^0.0.1",
+		"eventscript": "^0.0.2",
 		"uid": "^2.0.1"
 	}
 }
